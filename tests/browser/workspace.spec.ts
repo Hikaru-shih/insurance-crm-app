@@ -1,0 +1,161 @@
+import { test, expect, Page } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
+const password = 'Browser-test-password-2026!';
+async function register(page: Page) {
+  const email = `browser-${Date.now()}-${Math.random().toString(36).slice(2)}@example.test`;
+  await page.goto('/');
+  await page.getByRole('button', { name: '建立測試帳號', exact: true }).click();
+  await page.getByLabel('帳號 Email', { exact: true }).fill(email);
+  await page.getByLabel('密碼', { exact: true }).fill(password);
+  await page.getByRole('button', { name: '建立帳號並登入', exact: true }).click();
+  await expect(page.getByRole('button', { name: '登出', exact: true })).toBeVisible();
+  return email;
+}
+
+test('login, latest contact fields, persistence, search and logout', async ({ page }) => {
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  const email = await register(page);
+  await page.getByRole('button', { name: '＋ 新增聯絡人', exact: true }).first().click();
+  await expect(page.getByLabel('手機', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('暱稱', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '儲存', exact: true }).click();
+  await expect(page.getByText('請輸入姓名。', { exact: true })).toBeVisible();
+  await page.getByLabel('姓名（必填）', { exact: true }).fill('新版測試客戶');
+  await page.getByRole('button', { name: '儲存', exact: true }).click();
+  await expect(page.getByText('已儲存', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '返回上一頁', exact: true }).click();
+  await page.getByRole('button', { name: '查看我的聯絡人 →' }).click();
+  await page.getByRole('button', { name: '查看 新版測試客戶', exact: true }).click();
+  await page.getByRole('button', { name: '編輯聯絡人', exact: true }).click();
+  await page.getByLabel('IG', { exact: true }).fill('@test.client');
+  await page.getByLabel('性別', { exact: true }).fill('女');
+  await page.getByLabel('群組', { exact: true }).fill('朋友、同事');
+  await page.getByLabel('生日（YYYY-MM-DD）', { exact: true }).fill('1995-02-30');
+  await page.getByRole('button', { name: '儲存', exact: true }).click();
+  await expect(page.getByText('生日請使用有效的 YYYY-MM-DD 日期。', { exact: true })).toBeVisible();
+  await page.getByLabel('生日（YYYY-MM-DD）', { exact: true }).fill('1995-05-20');
+  await page.getByRole('button', { name: '儲存', exact: true }).click();
+  await expect(page.getByText('已儲存', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '返回上一頁', exact: true }).click();
+  await expect(page.getByText('1995-05-20', { exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: '查看我的聯絡人 →' }).click();
+  await page.getByLabel('搜尋聯絡人', { exact: true }).fill('同事');
+  await page.getByRole('button', { name: '查看 新版測試客戶', exact: true }).click();
+  await expect(page.getByText('已儲存', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '返回上一頁', exact: true }).click();
+  await expect(page.getByText('1995-05-20', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '⚙ 分級' }).click();
+  await expect(page.getByText('固定，不可修改', { exact: true })).toHaveCount(3);
+  await page.getByLabel('等級名稱', { exact: true }).fill('VIP客戶');
+  await page.getByLabel('聯絡間隔', { exact: true }).fill('2');
+  await page.getByRole('button', { name: '新增等級', exact: true }).click();
+  await expect(page.getByText('自訂等級', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '登出', exact: true }).click();
+  await expect(page.getByRole('button', { name: '登入', exact: true })).toBeVisible();
+  await expect(page.getByText('新版測試客戶', { exact: true })).toHaveCount(0);
+  await page.getByLabel('帳號 Email', { exact: true }).fill(email);
+  await page.getByLabel('密碼', { exact: true }).fill(password);
+  await page.getByRole('button', { name: '登入', exact: true }).click();
+  await page.getByRole('button', { name: '查看我的聯絡人 →' }).click();
+  await expect(page.getByRole('button', { name: '查看 新版測試客戶', exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('legacy import is explicit and does not erase local backup', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (localStorage.getItem('qianmai.local-workspace.v1')) return;
+    localStorage.setItem('qianmai.local-workspace.v1', JSON.stringify({ version: 1, grades: [], contacts: [{ id: 'legacy-test', name: '舊版客戶', nickname: '舊暱稱', phone: '0900000000', email: '', grade: '', notes: '', createdAt: '2026-09-10', updatedAt: '2026-09-10', importantDates: [{ id: 'date1', label: '紀念日', date: '2020-01-01' }] }] }));
+  });
+  await register(page);
+  await page.getByRole('button', { name: '將本機舊資料匯入此帳號' }).click();
+  await expect(page.getByText('舊版資料已匯入，原始本機資料仍保留。', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '查看我的聯絡人 →' }).click();
+  await expect(page.getByRole('button', { name: '查看 舊版客戶', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('qianmai.local-workspace.v1')!).contacts[0].phone)).toBe('0900000000');
+});
+
+test('desktop and narrow layouts render without overflow', async ({ page }) => {
+  await register(page);
+  await expect(page.getByRole('button', { name: '下一個月' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.getByRole('button', { name: '＋ 新增聯絡人', exact: true }).first().click();
+  await expect(page.getByLabel('IG', { exact: true })).toBeVisible();
+  await page.screenshot({ path: 'test-results/mobile-form.png', fullPage: true, animations: 'disabled' });
+});
+
+test('admin login exposes account and audit skeleton', async ({ page }) => {
+  const email = `admin-${Date.now()}@example.test`;
+  execFileSync(process.execPath, ['--import', 'tsx', '-e', "const {createApi}=require('./server/app.ts'); const app=createApi({database:'.data/browser-test.sqlite'}); app.createUser(process.env.TEST_ADMIN_EMAIL,process.env.TEST_ADMIN_PASSWORD,'admin').then(()=>app.db.close()).catch(()=>process.exit(1));"], { env: { ...process.env, TEST_ADMIN_EMAIL: email, TEST_ADMIN_PASSWORD: password } });
+  await page.goto('/');
+  await page.getByLabel('帳號 Email', { exact: true }).fill(email);
+  await page.getByLabel('密碼', { exact: true }).fill(password);
+  await page.getByRole('button', { name: '登入', exact: true }).click();
+  await page.getByRole('button', { name: '管理後台', exact: true }).click();
+  await expect(page.getByText('管理後台 · 帳號與紀錄', { exact: true })).toBeVisible();
+  await expect(page.getByText(`${email} · 管理員`, { exact: true })).toBeVisible();
+  await expect(page.getByText('最近操作', { exact: true })).toBeVisible();
+});
+
+test('record button is visible and records persist after saving', async ({ page }) => {
+  await register(page);
+  await page.getByRole('button', { name: '＋ 新增聯絡人', exact: true }).first().click();
+  await page.getByLabel('姓名（必填）', { exact: true }).fill('紀錄驗證');
+  await page.getByRole('button', { name: '紀錄', exact: true }).click();
+  await page.getByRole('button', { name: '＋ 新增紀錄', exact: true }).click();
+  await page.getByLabel('紀錄內容', { exact: true }).fill('已電話聯絡，下週再約。');
+  await page.getByRole('button', { name: '儲存', exact: true }).click();
+  await expect(page.getByText('已儲存', { exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: '查看我的聯絡人 →' }).click();
+  await page.getByRole('button', { name: '查看 紀錄驗證', exact: true }).click();
+  await page.getByRole('button', { name: '編輯聯絡人', exact: true }).click();
+  await page.getByRole('button', { name: '紀錄', exact: true }).click();
+  await expect(page.getByText('已電話聯絡，下週再約。', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '編輯紀錄', exact: true }).click();
+  await page.getByLabel('紀錄內容', { exact: true }).fill('已改約下個月');
+  await page.getByRole('button', { name: '完成編輯', exact: true }).click();
+  await expect(page.getByText('已改約下個月', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '刪除紀錄', exact: true }).click();
+  await page.getByRole('button', { name: '取消刪除', exact: true }).click();
+  await expect(page.getByText('已改約下個月', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '刪除紀錄', exact: true }).click();
+  await page.getByRole('button', { name: '確認刪除', exact: true }).click();
+  await expect(page.getByText('已改約下個月', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '儲存', exact: true }).click();
+  await expect(page.getByText('已儲存', { exact: true })).toBeVisible();
+});
+test('score card is read only', async ({ page }) => {
+  await register(page);
+  await page.getByRole('button', {name:'▥ 計分卡',exact:true}).click();
+  await expect(page.getByText('0 分',{exact:true}).first()).toBeVisible();
+  await expect(page.getByRole('button',{name:'登記完成並計分',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'撤銷計分',exact:true})).toHaveCount(0);
+});
+test('tracking completion, undo and archive work from contact details', async ({page}) => {
+  await register(page);
+  await page.getByRole('button',{name:'＋ 新增聯絡人',exact:true}).first().click();
+  await page.getByLabel('姓名（必填）',{exact:true}).fill('追蹤驗證');
+  await page.getByRole('button',{name:'儲存',exact:true}).click();
+  await expect(page.getByText('已儲存',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'返回上一頁',exact:true}).click();
+  await page.getByRole('button',{name:'查看我的聯絡人 →'}).click();
+  await page.getByRole('button',{name:'查看 追蹤驗證',exact:true}).click();
+  await page.getByRole('button',{name:'完成聯絡並安排下次',exact:true}).click();
+  await page.getByLabel('本次聯絡內容',{exact:true}).fill('完成電話聯絡');
+  await page.getByLabel('下次聯絡日期（YYYY-MM-DD，留空為未定）',{exact:true}).fill('2027-01-01');
+  await page.getByRole('button',{name:'儲存聯絡安排',exact:true}).click();
+  await expect(page.getByText('下次聯絡：2027-01-01',{exact:true})).toBeVisible();
+  await expect(page.getByText('完成電話聯絡',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'撤銷最近一次安排',exact:true}).click();
+  await page.getByRole('button',{name:'確認撤銷',exact:true}).click();
+  await expect(page.getByText('完成電話聯絡',{exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'封存聯絡人',exact:true}).click();
+  await page.getByRole('button',{name:'確認封存',exact:true}).click();
+  await expect(page.getByText('已封存，暫停聯絡提醒',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'恢復聯絡人',exact:true}).click();
+  await page.getByRole('button',{name:'確認恢復',exact:true}).click();
+  await expect(page.getByRole('button',{name:'完成聯絡並安排下次',exact:true})).toBeVisible();
+});

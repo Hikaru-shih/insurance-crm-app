@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "錢脈",
+    "slug": "qianmai",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "web": { "bundler": "metro", "output": "single", "name": "錢脈｜業務工作台" },
+    "ios": { "supportsTablet": true }
+  }
+}

@@ -1,4 +1,16 @@
 # Miscellaneous
+.tools/
+.data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+node_modules/
+.expo/
+dist/
+.env
+.env.*
+!.env.example
+test-results/
 *.class
 *.lock
 *.log
