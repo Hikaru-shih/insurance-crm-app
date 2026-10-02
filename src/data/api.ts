@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import { parseWorkspace } from '../domain/workspace';
 import type { WorkspaceRepository } from './repository';
 export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001';
-export type Account = { id: string; email: string; role: 'user' | 'admin' };
+export type Account = { name?: string; id: string; email: string; role: 'user' | 'admin' };
 export type Session = { token: string; user: Account };
 export class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
 export async function api<T>(path: string, token?: string, method = 'GET', body?: unknown): Promise<T> {

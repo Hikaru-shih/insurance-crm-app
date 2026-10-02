@@ -24,6 +24,9 @@ test('scores use server rules, isolate owners, retry safely, revoke and preserve
     const entry = {id:'test-one',date:'2026-09-26',code:'contact',note:'完成聯繫',points:999};
     assert.equal((await call('/api/scores',a.token,'POST',entry)).status,200);
     await call('/api/scores',a.token,'POST',entry);
+    assert.equal((await call('/api/admin/users/'+ua.id+'/scores',b.token)).status,403);
+    assert.equal((await call('/api/admin/users/'+ua.id+'/scores',admin.token)).data[0].points,1);
+    assert.equal((await call('/api/admin/users/'+ub.id+'/scores',admin.token)).data.length,0);
     let rows = (await call('/api/scores',a.token)).data;
     assert.equal(rows.length,1); assert.equal(rows[0].points,1);
     assert.deepEqual((await call('/api/scores',b.token)).data,[]);

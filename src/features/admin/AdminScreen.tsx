@@ -1,8 +1,11 @@
+import { AccountDetails } from './AccountDetails';
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { api, Account, Session } from '../../data/api';
-import { Card, Button, s } from '../../ui/components';
+import { Card, Button, Field, s } from '../../ui/components';
 export function AdminScreen({ session }: { session: Session }) {
+  const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState<Account | null>(null);
   const [period, setPeriod] = useState<'week' | 'month'>('week');
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -17,5 +20,6 @@ export function AdminScreen({ session }: { session: Session }) {
     catch (e) { setError(e instanceof Error ? e.message : '儲存失敗'); }
     finally { setSaving(false); }
   };
-  return <View style={{ gap: 20 }}><Card><Text style={s.title}>計分卡結算設定</Text><Text style={s.muted}>套用至所有使用者。切換週期不清除累計分數；報表依目前有效紀錄重新統計。</Text><View style={s.row}><Button secondary={period !== 'week'} disabled={saving || !loaded} onPress={() => {setPeriod('week');setMessage('');}}>週報（週一至週日）</Button><Button secondary={period !== 'month'} disabled={saving || !loaded} onPress={() => {setPeriod('month');setMessage('');}}>月報（每月一日至月底）</Button></View><Button disabled={saving || !loaded} onPress={() => void savePeriod()}>{saving ? '儲存中…' : '儲存結算設定'}</Button>{!!message && <Text style={s.muted}>{message}</Text>}</Card><Card><Text style={s.title}>管理後台 · 帳號與紀錄</Text><Text style={s.muted}>目前提供帳號查閱及稽核紀錄。資料修改 API 已有權限控制，完整管理表單於後續階段接上。</Text><Button secondary onPress={() => void load()}>重新整理</Button>{!!error && <Text style={s.error}>{error}</Text>}{users.map(u => <Text key={u.id} style={s.label}>{u.email} · {u.role === 'admin' ? '管理員' : '使用者'}</Text>)}</Card><Card><Text style={s.title}>最近操作</Text>{audit.slice(0, 20).map(a => <Text key={a.id} style={s.muted}>{a.created_at} · {a.action}</Text>)}</Card></View>;
+  if (selected) return <AccountDetails key={selected.id} account={selected} session={session} onBack={() => { setSelected(null); void load(); }} />;
+  return <View style={{ gap: 20 }}><Card><Text style={s.title}>計分卡結算設定</Text><Text style={s.muted}>套用至所有使用者。切換週期不清除累計分數；報表依目前有效紀錄重新統計。</Text><View style={s.row}><Button secondary={period !== 'week'} disabled={saving || !loaded} onPress={() => {setPeriod('week');setMessage('');}}>週報（週一至週日）</Button><Button secondary={period !== 'month'} disabled={saving || !loaded} onPress={() => {setPeriod('month');setMessage('');}}>月報（每月一日至月底）</Button></View><Button disabled={saving || !loaded} onPress={() => void savePeriod()}>{saving ? '儲存中…' : '儲存結算設定'}</Button>{!!message && <Text style={s.muted}>{message}</Text>}</Card><Card><Text style={s.title}>管理後台 · 帳號與紀錄</Text><Text style={s.muted}>點選帳號查看其聯絡人、聯絡紀錄、安排與計分報表。</Text><Button secondary onPress={() => void load()}>重新整理</Button>{!!error && <Text style={s.error}>{error}</Text>}<Field label="搜尋帳號姓名或 Email" value={query} onChange={setQuery} placeholder="輸入姓名或 Email" />{loaded && !users.some(u => `${u.name ?? ''} ${u.email}`.toLowerCase().includes(query.trim().toLowerCase())) && <Text style={s.muted}>沒有符合的帳號。</Text>}{users.filter(u => `${u.name ?? ''} ${u.email}`.toLowerCase().includes(query.trim().toLowerCase())).map(u => <Button key={u.id} secondary onPress={() => setSelected(u)}>{u.name || u.email} {u.name ? `（${u.email}）` : '（尚未填姓名）'} · {u.role === 'admin' ? '管理員' : '使用者'} → 查看資料</Button>)}</Card><Card><Text style={s.title}>最近操作</Text>{audit.slice(0, 20).map(a => <Text key={a.id} style={s.muted}>{a.created_at} · {a.action}</Text>)}</Card></View>;
 }

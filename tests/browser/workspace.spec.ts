@@ -5,6 +5,7 @@ async function register(page: Page) {
   const email = `browser-${Date.now()}-${Math.random().toString(36).slice(2)}@example.test`;
   await page.goto('/');
   await page.getByRole('button', { name: '建立測試帳號', exact: true }).click();
+  if (await page.getByLabel('姓名（必填）', {exact:true}).count()) await page.getByLabel('姓名（必填）', {exact:true}).fill('瀏覽器測試');
   await page.getByLabel('帳號 Email', { exact: true }).fill(email);
   await page.getByLabel('密碼', { exact: true }).fill(password);
   await page.getByRole('button', { name: '建立帳號並登入', exact: true }).click();
@@ -54,6 +55,7 @@ test('login, latest contact fields, persistence, search and logout', async ({ pa
   await page.getByRole('button', { name: '登出', exact: true }).click();
   await expect(page.getByRole('button', { name: '登入', exact: true })).toBeVisible();
   await expect(page.getByText('新版測試客戶', { exact: true })).toHaveCount(0);
+  if (await page.getByLabel('姓名（必填）', {exact:true}).count()) await page.getByLabel('姓名（必填）', {exact:true}).fill('瀏覽器測試');
   await page.getByLabel('帳號 Email', { exact: true }).fill(email);
   await page.getByLabel('密碼', { exact: true }).fill(password);
   await page.getByRole('button', { name: '登入', exact: true }).click();
@@ -90,6 +92,7 @@ test('admin login exposes account and audit skeleton', async ({ page }) => {
   const email = `admin-${Date.now()}@example.test`;
   execFileSync(process.execPath, ['--import', 'tsx', '-e', "const {createApi}=require('./server/app.ts'); const app=createApi({database:'.data/browser-test.sqlite'}); app.createUser(process.env.TEST_ADMIN_EMAIL,process.env.TEST_ADMIN_PASSWORD,'admin').then(()=>app.db.close()).catch(()=>process.exit(1));"], { env: { ...process.env, TEST_ADMIN_EMAIL: email, TEST_ADMIN_PASSWORD: password } });
   await page.goto('/');
+  if (await page.getByLabel('姓名（必填）', {exact:true}).count()) await page.getByLabel('姓名（必填）', {exact:true}).fill('瀏覽器測試');
   await page.getByLabel('帳號 Email', { exact: true }).fill(email);
   await page.getByLabel('密碼', { exact: true }).fill(password);
   await page.getByRole('button', { name: '登入', exact: true }).click();
@@ -144,6 +147,7 @@ test('tracking completion, undo and archive work from contact details', async ({
   await page.getByRole('button',{name:'查看我的聯絡人 →'}).click();
   await page.getByRole('button',{name:'查看 追蹤驗證',exact:true}).click();
   await page.getByRole('button',{name:'完成聯絡並安排下次',exact:true}).click();
+  await page.getByRole('button',{name:'A',exact:true}).click();
   await page.getByLabel('本次聯絡內容',{exact:true}).fill('完成電話聯絡');
   await page.getByLabel('下次聯絡日期（YYYY-MM-DD，留空為未定）',{exact:true}).fill('2027-01-01');
   await page.getByRole('button',{name:'儲存聯絡安排',exact:true}).click();

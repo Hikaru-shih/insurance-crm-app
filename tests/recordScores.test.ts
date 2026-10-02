@@ -7,7 +7,7 @@ import { emptyContact } from '../src/domain/contacts';
 test('saved contact records count once, retain snapshots, move dates and revoke on deletion', () => {
   const db = openDatabase(':memory:');
   try {
-    db.prepare('INSERT INTO users VALUES(?,?,?,?,?,?)').run('u','test@example.com','hash','user',1,'2026-09-27');
+    db.prepare('INSERT INTO users(id,email,password_hash,role,active,created_at) VALUES(?,?,?,?,?,?)').run('u','test@example.com','hash','user',1,'2026-09-27');
     const empty = emptyWorkspace();
     const next = {...empty, contacts:[{...emptyContact(),id:'c',name:'測試',createdAt:'2026-09-27',updatedAt:'2026-09-27', records:[{id:'r',date:'2026-09-27',content:'已聯絡',scoreCode:'contact'}]}]};
     syncRecordScores(db,'u',empty,next);

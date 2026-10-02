@@ -7,7 +7,7 @@ export const DEFAULT_GRADES: readonly Grade[] = [
   { code: 'C', amount: 3, unit: 'month', fixed: true },
 ];
 export type ImportantDate = { id: string; label: string; date: string };
-export type ContactRecord = { id: string; date: string; content: string; scoreCode?: string };
+export type ContactRecord = { id: string; date: string; content: string; scoreCode?: string; reviewGrade?: string };
 export type Contact = {
   id: string; name: string; nickname: string; phone: string; email: string;
   gender: string; instagram: string; groups: string[]; birthday: string;
@@ -39,6 +39,7 @@ export function validateContact(draft: ContactDraft): string | null {
     for (const record of draft.records) {
       if (!record || typeof record.id !== 'string' || !record.id || record.id.length > 100 || ids.has(record.id)) return '聯絡紀錄識別碼無效。';
       ids.add(record.id);
+      if (record.reviewGrade !== undefined && (typeof record.reviewGrade !== 'string' || record.reviewGrade.length > 100)) return '重新分級資料無效。';
       if (record.scoreCode !== undefined && (typeof record.scoreCode !== 'string' || record.scoreCode.length > 100)) return '計分項目無效。';
       if (typeof record.date !== 'string' || !isDate(record.date)) return '紀錄日期請使用有效的 YYYY-MM-DD 日期。';
       if (typeof record.content !== 'string' || !record.content.trim() || record.content.length > 5000) return '紀錄內容請填寫 1–5000 個字元。';

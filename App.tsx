@@ -1,3 +1,4 @@
+import { needsGradeReview } from './src/domain/tracking';
 import { TodaySummary } from './src/features/score/TodaySummary';
 import { creationDate } from './src/domain/followups';
 import { ScoreScreen } from './src/features/score/ScoreScreen';
@@ -51,7 +52,7 @@ function WorkspaceApp({ session, onExpired }: { session: Session; onExpired: () 
   const currentTab = tab === 'admin' ? { label: '管理後台', subtitle: '帳號與管理操作紀錄' } : tabs.find(item => item.key === tab)!;
   const add = () => setEditor({});
   const pendingEvents = pendingFollowups(workspace.contacts, workspace.grades, creationDate(new Date().toISOString())!);
-  const pendingCount = workspace.loading || workspace.loadError ? 0 : pendingEvents.length + workspace.contacts.filter(c => !c.archived && c.nextContactDate === null).length;
+  const pendingCount = workspace.loading || workspace.loadError ? 0 : pendingEvents.length + workspace.contacts.filter(c => !c.archived && (needsGradeReview(c) || c.nextContactDate === null)).length;
 
   return <SafeAreaView style={styles.root}><StatusBar style="dark" /><View style={{ flex: 1, display: editor ? 'none' : 'flex' }}>
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: wide ? 36 : 18, gap: 24 }}>
@@ -66,7 +67,7 @@ function WorkspaceApp({ session, onExpired }: { session: Session; onExpired: () 
         {tab === 'admin' && session.user.role === 'admin' && <AdminScreen session={session} />}
         {tab === 'settings' && <GradesScreen onUpdate={workspace.updateGrade} onDelete={workspace.deleteGrade} grades={workspace.grades} saving={workspace.saving} onAdd={workspace.addGrade} />}
         {tab === 'pending' && <CalendarScreen pending events={pendingEvents} saving={workspace.saving} onAddContact={add} onComplete={async event => openContact(event.contactId)} />}
-        {tab === 'pending' && <Card><Text style={s.title}>尚未安排日期</Text>{workspace.contacts.filter(c => !c.archived && c.nextContactDate === null).map(c => <Button key={c.id} secondary onPress={() => openContact(c.id)}>{c.name} · 安排日期</Button>)}</Card>}
+        {tab === 'pending' && <Card><Text style={s.title}>待重新分級／尚未安排日期</Text>{workspace.contacts.filter(c => !c.archived && (needsGradeReview(c) || c.nextContactDate === null)).map(c => <Button key={c.id} secondary onPress={() => openContact(c.id)}>{c.name} · {needsGradeReview(c) ? '待重新分級' : '安排日期'}</Button>)}</Card>}
         {tab === 'score' && <ScoreScreen session={session} />}
       </>}
       <Text style={{ color: '#897457', fontSize: 11, textAlign: 'center', marginVertical: 5 }}>錢脈 · 把關係放在心上，把日常安排妥當。</Text>

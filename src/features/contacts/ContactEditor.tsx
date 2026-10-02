@@ -1,3 +1,4 @@
+import { reviewContactGrade, needsGradeReview } from '../../domain/tracking';
 import { api, Session } from '../../data/api';
 import * as Crypto from 'expo-crypto';
 import { useEffect, useState } from 'react';
@@ -32,12 +33,12 @@ export function ContactEditor({ session, contact, grades, saving, onSave, onClos
       setGradeError('');
       const grade = createGrade(gradeName, Number(gradeAmount), gradeUnit, grades);
       await onAddGrade(grade.code, grade.amount, grade.unit);
-      set('grade', grade.code);
+      setDraft(d => reviewContactGrade(d, grade.code, [...grades, grade])); setSaved(false);
       setAddingGrade(false); setGradeName(''); setGradeAmount('');
     } catch (e) { setGradeError(e instanceof Error ? e.message : '新增等級失敗，請重試。'); }
   };
   const close = () => { if (saving) return; dirty ? setDiscard(true) : onClose(); };
-  const save = async () => { try { setError(''); const snapshot = JSON.stringify(draft); const result = await onSave(draft, contactId); setContactId(result.id); setCreatedAt(result.createdAt); setSavedDraft(snapshot); setSaved(true); setDiscard(false); } catch (e) { setError(e instanceof Error ? e.message : '儲存失敗，請重試。'); } };
+  const save = async () => { try { setError(''); const snapshot = JSON.stringify(draft); const result = await onSave(draft, contactId); setContactId(result.id); setCreatedAt(result.createdAt); setDraft(result); setSavedDraft(JSON.stringify(result)); setSaved(true); setDiscard(false); } catch (e) { setError(e instanceof Error ? e.message : '儲存失敗，請重試。'); } };
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => { close(); return true; });
     return () => subscription.remove();
@@ -58,8 +59,8 @@ export function ContactEditor({ session, contact, grades, saving, onSave, onClos
           <Field label="備註" value={draft.notes} onChange={v => set('notes', v)} placeholder="記下一點關於這位客戶的事…" multiline />
         </ScrollView>
         {section === 'grades' && <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24, gap: 18 }}>
-          <Text style={s.label}>客戶等級</Text>
-          <View style={s.row}>{[{ code: '', text: '未分級' }, ...grades.map(g => ({ code: g.code, text: `${g.code} · ${gradeLabel(g)}` }))].map(g => <Pressable key={g.code} accessibilityRole="button" accessibilityState={{ selected: draft.grade === g.code }} onPress={() => set('grade', g.code)} style={[styles.chip, draft.grade === g.code && { backgroundColor: c.green }]}><Text style={{ color: draft.grade === g.code ? 'white' : c.green }}>{g.text}</Text></Pressable>)}</View>
+          <Text style={s.label}>客戶等級</Text>{needsGradeReview(draft) && <Text style={s.error}>本次聯絡尚未重新分級；請選一次等級（可沿用原等級），儲存後才安排下次聯絡。</Text>}
+          <View style={s.row}>{[{ code: '', text: '未分級' }, ...grades.map(g => ({ code: g.code, text: `${g.code} · ${gradeLabel(g)}` }))].map(g => <Pressable key={g.code} accessibilityRole="button" accessibilityState={{ selected: draft.grade === g.code }} onPress={() => { if (g.code) { setDraft(d => reviewContactGrade(d, g.code, grades)); setSaved(false); } else set('grade', ''); }} style={[styles.chip, draft.grade === g.code && { backgroundColor: c.green }]}><Text style={{ color: draft.grade === g.code ? 'white' : c.green }}>{g.text}</Text></Pressable>)}</View>
 
           <Button secondary disabled={saving} onPress={() => setAddingGrade(value => !value)}>{addingGrade ? '收起新增等級' : '＋ 新增等級'}</Button>
           {addingGrade && <View style={{ padding: 16, gap: 16, backgroundColor: c.background, borderRadius: 12 }}>
@@ -74,7 +75,7 @@ export function ContactEditor({ session, contact, grades, saving, onSave, onClos
         </ScrollView>}
         {section === 'records' && <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24, gap: 18 }}>
           <Text style={s.title}>{draft.name || '此聯絡人'}的聯絡紀錄</Text>
-          <Button secondary disabled={saving} onPress={() => { const id = Crypto.randomUUID(); set('records', [{ id, date: creationDate(new Date().toISOString())!, content: '' }, ...(draft.records ?? [])]); setEditingRecord(id); }}>＋ 新增紀錄</Button>
+          <Button secondary disabled={saving} onPress={() => { const id = Crypto.randomUUID(); set('records', [{ id, date: creationDate(new Date().toISOString())!, content: '', reviewGrade: '' }, ...(draft.records ?? [])]); setEditingRecord(id); }}>＋ 新增紀錄</Button>
           <Text style={s.muted}>新增、編輯或刪除紀錄後，按上方「儲存」才會保存。</Text>
           {(draft.records ?? []).map(record => <View key={record.id} style={{ padding: 16, gap: 12, borderRadius: 12, backgroundColor: c.background }}>
             {editingRecord === record.id ? <><Field label="紀錄日期（YYYY-MM-DD）" value={record.date} onChange={date => set('records', draft.records!.map(item => item.id === record.id ? { ...item, date } : item))} />

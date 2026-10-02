@@ -38,7 +38,8 @@ test('authenticated API isolation, grants, admin and durable data', async t => {
     const own = `/api/workspaces/${a.id}`;
     let saved = emptyWorkspace();
     await t.test('server owns roles and password hashes, not client fields', async () => {
-      const result = await request('/api/auth/register', undefined, 'POST', { email: 'new@example.test', password, role: 'admin' });
+      assert.equal((await request('/api/auth/register', undefined, 'POST', {email:'noname@example.test',password,name:'   '})).status,400);
+      const result = await request('/api/auth/register', undefined, 'POST', { email: 'new@example.test', name: '測試姓名', password, role: 'admin' });
       assert.equal(result.status, 201); assert.equal(result.data.role, 'user');
       assert.equal((await request('/api/auth/login', undefined, 'POST', { email: a.email, password: 'wrong' })).status, 401);
       const row = app.db.prepare('SELECT password_hash FROM users WHERE id=?').get(a.id)!;

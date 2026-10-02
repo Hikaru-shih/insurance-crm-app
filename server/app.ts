@@ -6,7 +6,7 @@ import { openDatabase } from './database';
 import { digest, hashPassword, verifyPassword } from './security';
 import { emptyWorkspace, parseWorkspace, Workspace } from '../src/domain/workspace';
 
-type User = { id: string; email: string; role: 'user' | 'admin'; active: number; password_hash: string };
+type User = { name: string; id: string; email: string; role: 'user' | 'admin'; active: number; password_hash: string };
 class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
 function fail(status: number, message: string): never { throw new ApiError(status, message); }
 export function createApi(options: { database: string; allowRegistration?: boolean; origins?: string[] }) {
@@ -15,14 +15,14 @@ export function createApi(options: { database: string; allowRegistration?: boole
   const attempts = new Map<string, { count: number; reset: number }>();
   const audit = (actor: string, action: string, target: string) => db.prepare('INSERT INTO audit_log VALUES(?,?,?,?,?)').run(randomUUID(), actor, action, target, new Date().toISOString());
   const transaction = <T>(work: () => T): T => { db.exec('BEGIN IMMEDIATE'); try { const result = work(); db.exec('COMMIT'); return result; } catch (e) { db.exec('ROLLBACK'); throw e; } };
-  const publicUser = (user: User) => ({ id: user.id, email: user.email, role: user.role });
-  async function createUser(email: string, password: string, role: 'user' | 'admin' = 'user') {
+  const publicUser = (user: User) => ({ id: user.id, email: user.email, name: user.name, role: user.role });
+  async function createUser(email: string, password: string, role: 'user' | 'admin' = 'user', name = '') {
     email = email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || password.length < 12 || password.length > 128) fail(400, '請輸入有效 Email，密碼需 12–128 個字元。');
     const passwordHash = await hashPassword(password);
     const id = randomUUID();
     try { transaction(() => {
-      db.prepare('INSERT INTO users(id,email,password_hash,role,created_at) VALUES(?,?,?,?,?)').run(id, email, passwordHash, role, new Date().toISOString());
+      db.prepare('INSERT INTO users(id,email,password_hash,role,created_at,name) VALUES(?,?,?,?,?,?)').run(id, email, passwordHash, role, new Date().toISOString(), name.trim());
       db.prepare('INSERT INTO workspaces VALUES(?,?,?,?)').run(id, 0, JSON.stringify(emptyWorkspace()), new Date().toISOString());
       audit(id, 'account.created', id);
     }); } catch (e) { if (String(e).includes('UNIQUE')) fail(409, '帳號已存在，請登入。'); throw e; }
@@ -64,13 +64,14 @@ export function createApi(options: { database: string; allowRegistration?: boole
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
       if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
       const path = new URL(req.url ?? '/', 'http://localhost').pathname;
-      if (path === '/api/health' && req.method === 'GET') { json(res, 200, { ok: true, schema: 3 }); return; }
+      if (path === '/api/health' && req.method === 'GET') { json(res, 200, { ok: true, schema: 4 }); return; }
       if (['/api/auth/register', '/api/auth/login'].includes(path) && req.method === 'POST') {
         rateLimit(req); const input = await body(req);
         if (typeof input.email !== 'string' || typeof input.password !== 'string' || input.password.length > 128 || input.email.length > 254) fail(400, '帳號或密碼格式錯誤');
         if (path.endsWith('register')) {
           if (!options.allowRegistration) fail(403, '目前不開放自行註冊，請聯絡管理員');
-          json(res, 201, await createUser(input.email, input.password)); return;
+          if (typeof input.name !== 'string' || !input.name.trim() || [...input.name.trim()].length > 80) fail(400, '姓名請填寫 1–80 個字元。');
+          json(res, 201, await createUser(input.email, input.password, 'user', input.name)); return;
         }
         const user = db.prepare('SELECT * FROM users WHERE email=?').get(input.email.trim().toLowerCase()) as User | undefined;
         const dummy = '00000000000000000000000000000000:' + '00'.repeat(64);
@@ -102,6 +103,14 @@ export function createApi(options: { database: string; allowRegistration?: boole
             if (beforeIds !== next.contacts.map(c => c.id).sort().join(',')) fail(403, '管理員目前只可修改，不能代新增或刪除聯絡人');
           }
           const prior = db.prepare('SELECT data FROM workspaces WHERE owner_id=?').get(owner) as {data:string};
+          const previousContacts = parseWorkspace(JSON.parse(prior.data)).contacts;
+          for (const contact of next.contacts) {
+            const old = previousContacts.find(c => c.id === contact.id);
+            for (const record of contact.records ?? []) {
+              if (!old?.records?.some(r => r.id === record.id) && record.reviewGrade === undefined) record.reviewGrade = '';
+              if (record.reviewGrade && old?.records?.find(r => r.id === record.id)?.reviewGrade !== record.reviewGrade && !next.grades.some(g => g.code === record.reviewGrade)) fail(400,'重新分級不存在');
+            }
+          }
           try { syncRecordScores(db, owner, parseWorkspace(JSON.parse(prior.data)), next); } catch (e) { fail(400, e instanceof Error ? e.message : '紀錄計分失敗'); }
           const revision = next.revision + 1;
           const data = { ...next, revision };
@@ -178,7 +187,12 @@ export function createApi(options: { database: string; allowRegistration?: boole
       if (path === '/api/kpi-rules' && req.method === 'GET') { json(res, 200, db.prepare('SELECT * FROM kpi_rules ORDER BY points,code').all()); return; }
       if (path.startsWith('/api/admin/')) {
         if (user.role !== 'admin') fail(403, '需要管理員權限');
-        if (path === '/api/admin/users' && req.method === 'GET') { json(res, 200, db.prepare('SELECT id,email,role,active,created_at FROM users ORDER BY created_at DESC').all()); return; }
+        const accountScores = path.match(/^\/api\/admin\/users\/([^/]+)\/scores$/);
+        if (accountScores && req.method === 'GET') {
+          if (!db.prepare('SELECT id FROM users WHERE id=?').get(accountScores[1])) fail(404,'帳號不存在');
+          audit(user.id,'admin.scores.read',accountScores[1]);
+          json(res,200,db.prepare('SELECT * FROM score_entries WHERE owner_id=? ORDER BY date DESC,id').all(accountScores[1])); return;
+        }        if (path === '/api/admin/users' && req.method === 'GET') { json(res, 200, db.prepare('SELECT id,email,name,role,active,created_at FROM users ORDER BY created_at DESC').all()); return; }
         if (path === '/api/admin/audit' && req.method === 'GET') { json(res, 200, db.prepare('SELECT id,actor_id,action,target_id,created_at FROM audit_log ORDER BY created_at DESC LIMIT 100').all()); return; }
       }
       fail(404, '找不到此功能');

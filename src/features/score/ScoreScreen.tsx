@@ -7,14 +7,14 @@ import { Button, Card, Field, s } from '../../ui/components';
 import { colors as c } from '../../ui/theme';
 type Rule = { code: string; label: string; points: number };
 type Entry = Rule & { id: string; date: string; note: string; revoked: number };
-export function ScoreScreen({ session }: { session: Session }) {
+export function ScoreScreen({ session, ownerId }: { session: Session; ownerId?: string }) {
   const [rules, setRules] = useState<Rule[]>([]), [entries, setEntries] = useState<Entry[]>([]);
   const [date, setDate] = useState(() => creationDate(new Date().toISOString())!);
   const [error, setError] = useState(''), [busy, setBusy] = useState(false), [ready, setReady] = useState(false);
   const [period, setPeriod] = useState<ReportPeriod>('week');
   const lock = useRef(false);
   const load = async () => {
-    const [r, e, settings] = await Promise.all([api<Rule[]>('/api/kpi-rules',session.token),api<Entry[]>('/api/scores',session.token), api<{period:ReportPeriod}>('/api/report-settings',session.token)]);
+    const [r, e, settings] = await Promise.all([api<Rule[]>('/api/kpi-rules',session.token),api<Entry[]>(ownerId ? `/api/admin/users/${ownerId}/scores` : '/api/scores',session.token), api<{period:ReportPeriod}>('/api/report-settings',session.token)]);
     setRules(r); setEntries(e); setPeriod(settings.period); setReady(true);
   };
   const run = async (action: () => Promise<void>) => {
@@ -23,7 +23,7 @@ export function ScoreScreen({ session }: { session: Session }) {
     try { await action(); } catch (e) { setError(e instanceof Error ? e.message : '操作失敗'); }
     finally { lock.current = false; setBusy(false); }
   };
-  useEffect(() => { void run(load); }, [session.token]);
+  useEffect(() => { void run(load); }, [session.token, ownerId]);
   const daily = entries.filter(e => e.date === date), total = daily.filter(e => !e.revoked).reduce((sum,e) => sum + e.points,0);
   const cumulative = entries.filter(e => !e.revoked).reduce((sum,e) => sum + e.points,0);
   const range = reportRange(date,period);
