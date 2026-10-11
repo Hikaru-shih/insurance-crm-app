@@ -1,10 +1,14 @@
+import {DateRangePicker,useDateRange} from '../../ui/DateRangePicker';
+import { ScheduleEvent } from '../../domain/events';
 import { useState } from 'react';
 import { Modal, Text, View } from 'react-native';
 import { Contact, ContactDraft, ContactRecord } from '../../domain/contacts';
 import { creationDate } from '../../domain/followups';
-import { Button, Card, Field, s } from '../../ui/components';
+import { Button, Card, Field, useStyles } from '../../ui/components';
 
-export function ContactRecords({ contact, saving, onSave }: { contact: Contact; saving: boolean; onSave: (draft: ContactDraft, id?: string) => Promise<Contact> }) {
+export function ContactRecords({ events = [], onOpenEvent, contact, saving, onSave }: { events?: ScheduleEvent[]; onOpenEvent?:(event:ScheduleEvent)=>void; contact: Contact; saving: boolean; onSave: (draft: ContactDraft, id?: string) => Promise<Contact> }) {
+  const s = useStyles();
+  const selection=useDateRange();
   const [editing, setEditing] = useState<ContactRecord | null>(null);
   const [deleting, setDeleting] = useState<ContactRecord | null>(null);
   const [error, setError] = useState('');
@@ -24,12 +28,14 @@ export function ContactRecords({ contact, saving, onSave }: { contact: Contact; 
       setDeleting(null);
     } catch (e) { setError(e instanceof Error ? e.message : '刪除失敗，請重試。'); }
   };
-  return <Card><Text style={s.title}>聯絡紀錄</Text>
-    {(contact.records ?? []).map(record => <View key={record.id} style={{ gap: 12, paddingVertical: 12 }}>
+  return <Card><Text style={s.title}>聯絡紀錄</Text><DateRangePicker value={selection} label="紀錄時段" />
+    {(contact.records ?? []).filter(record=>selection.contains(record.date)).map(record => <View key={record.id} style={{ gap: 12, paddingVertical: 12 }}>
       <Text style={s.label}>{record.date}</Text><Text selectable style={s.muted}>{record.content}</Text>
+      {onOpenEvent&&events.filter(e=>e.contactId===contact.id&&e.recordId===record.id).map(e=><Button key={e.id} secondary onPress={()=>onOpenEvent(e)}>查看來源行程：{e.title}</Button>)}
       <View style={s.row}><Button secondary disabled={saving} onPress={() => { setError(''); setEditing({ ...record }); }}>編輯紀錄</Button><Button secondary disabled={saving} onPress={() => { setError(''); setDeleting(record); }}>刪除紀錄</Button></View>
     </View>)}
-    <Text style={s.muted}>{creationDate(contact.createdAt) ?? '日期不明'} · 新增聯絡人</Text>
+    {selection.contains(creationDate(contact.createdAt))&&<Text style={s.muted}>{creationDate(contact.createdAt)} · 新增聯絡人</Text>}
+    {selection.range&&!selection.contains(creationDate(contact.createdAt))&&!(contact.records??[]).some(record=>selection.contains(record.date))&&<Text style={s.muted}>此時段沒有紀錄。</Text>}
     <Modal visible={!!editing || !!deleting} transparent animationType="fade" onRequestClose={() => { if (!saving) { setEditing(null); setDeleting(null); } }}>
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
         <View accessibilityViewIsModal style={{ width: '100%', maxWidth: 520, backgroundColor: 'white', borderRadius: 16, padding: 24, gap: 16 }}>

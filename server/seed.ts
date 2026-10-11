@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { createApi } from './app';
 async function main() {
   if (existsSync('.env')) process.loadEnvFile('.env');
+  if (process.env.DATABASE_URL || process.env.NODE_ENV === 'production') throw new Error('測試帳號僅供本機 SQLite 使用，不可在雲端或正式環境建立');
   const app = createApi({ database: resolve(process.env.DATABASE_PATH ?? '.data/development.sqlite') });
   const accounts: string[] = [];
   for (const [email, role] of [['admin@example.test', 'admin'], ['a@example.test', 'user'], ['b@example.test', 'user']] as const) {

@@ -38,6 +38,9 @@ test('authenticated API isolation, grants, admin and durable data', async t => {
     const own = `/api/workspaces/${a.id}`;
     let saved = emptyWorkspace();
     await t.test('server owns roles and password hashes, not client fields', async () => {
+      assert.equal((await request('/api/auth/register',undefined,'POST',{email:'boundary@example.test',name:'密碼邊界',password:'Seven12'})).status,400);
+      assert.equal((await request('/api/auth/register',undefined,'POST',{email:'boundary@example.test',name:'密碼邊界',password:'Eight123'})).status,201);
+      assert.equal((await request('/api/auth/login',undefined,'POST',{email:'boundary@example.test',password:'Eight123'})).status,200);
       assert.equal((await request('/api/auth/register', undefined, 'POST', {email:'noname@example.test',password,name:'   '})).status,400);
       const result = await request('/api/auth/register', undefined, 'POST', { email: 'new@example.test', name: '測試姓名', password, role: 'admin' });
       assert.equal(result.status, 201); assert.equal(result.data.role, 'user');
@@ -60,8 +63,13 @@ test('authenticated API isolation, grants, admin and durable data', async t => {
       assert.equal((await request(own, at, 'PUT', draft)).status, 409);
       const ownB = await request(`/api/workspaces/${b.id}`, bt); assert.equal(ownB.data.contacts.length, 0);
     });
-    await t.test('direct API validates fields and protects fixed grades', async () => {
-      const invalid = structuredClone(saved); invalid.grades[0].amount = 99;
+    await t.test('direct API supports adjustable grades and validates fields', async () => {
+      const adjusted = structuredClone(saved); adjusted.grades[0].amount = 99;
+      const result = await request(own, at, 'PUT', adjusted);
+      assert.equal(result.status, 200); saved = result.data;
+      assert.equal(saved.grades[0].amount, 99);
+      assert.equal((await request('/api/scores', at)).data.filter((row: {id:string}) => row.id === 'contact-created:contact-a').length, 1);
+      const invalid = structuredClone(saved); invalid.grades[0].amount = 0;
       assert.equal((await request(own, at, 'PUT', invalid)).status, 400);
       const blank = structuredClone(saved); blank.contacts[0].name = '  ';
       assert.equal((await request(own, at, 'PUT', blank)).status, 400);
@@ -69,13 +77,30 @@ test('authenticated API isolation, grants, admin and durable data', async t => {
       assert.equal((await request(own, at, 'PUT', badBirthday)).status, 400);
     });
     await t.test('grant is readonly, cannot be transitive, revoke immediately blocks reads', async () => {
+      assert.equal((await request(`/api/workspaces/${a.id}/scores`, bt)).status, 403);
+      assert.deepEqual((await request('/api/shared-with-me', bt)).data, []);
       assert.equal((await request('/api/grants', at, 'POST', { email: b.email })).status, 201);
       assert.equal((await request(own, bt)).status, 200);
+      assert.equal((await request(`/api/workspaces/${a.id}/scores`, bt)).status, 200);
+      assert.equal((await request('/api/shared-with-me', bt)).data[0].id, a.id);
+      assert.equal((await request('/api/grants', at)).data[0].viewer_email, b.email);
+      assert.equal((await request('/api/grants', at, 'POST', {email:a.email})).status,400);
+      assert.equal((await request('/api/grants', at, 'POST', {email:'missing@example.test'})).status,400);
+      assert.equal((await request('/api/grants', at, 'POST', {email:b.email})).status,201);
+      assert.equal((await request('/api/grants', at)).data.length,1);
       assert.equal((await request(own, bt, 'PUT', saved)).status, 403);
-      await request('/api/grants', bt, 'POST', { email: 'new@example.test', ownerId: a.id });
+      assert.equal((await request(`/api/workspaces/${a.id}/scores`, bt, 'POST', {})).status,404);
+      assert.equal((await request('/api/grants', bt, 'POST', { email: 'new@example.test', ownerId: a.id })).status,403);
       const nt = await login('new@example.test'); assert.equal((await request(own, nt)).status, 403);
+      app.db.prepare('UPDATE users SET active=0 WHERE id=?').run(a.id);
+      assert.equal((await request(own,bt)).status,403);
+      assert.equal((await request(`/api/workspaces/${a.id}/scores`,bt)).status,403);
+      assert.deepEqual((await request('/api/shared-with-me',bt)).data,[]);
+      app.db.prepare('UPDATE users SET active=1 WHERE id=?').run(a.id);
       await request(`/api/grants/${b.id}`, at, 'DELETE');
       assert.equal((await request(own, bt)).status, 403);
+      assert.equal((await request(`/api/workspaces/${a.id}/scores`, bt)).status,403);
+      assert.deepEqual((await request('/api/shared-with-me',bt)).data,[]);
       assert.equal((app.db.prepare("SELECT count(*) AS total FROM audit_log WHERE action='grant.revoked'").get()!).total, 1);
     });
     await t.test('admin can modify but not add or delete another owner contacts', async () => {
@@ -83,6 +108,12 @@ test('authenticated API isolation, grants, admin and durable data', async t => {
       const result = await request(own, mt, 'PUT', modified); assert.equal(result.status, 200); saved = result.data;
       const deleted = structuredClone(saved); deleted.contacts = [];
       assert.equal((await request(own, mt, 'PUT', deleted)).status, 403);
+      const withEvent = structuredClone(saved);
+      withEvent.events = [{id:'event',title:'帳號行程',date:null,originalDate:null,time:'',color:'#245C49',notes:'',completed:false,history:[]}];
+      assert.equal((await request(own, mt, 'PUT', withEvent)).status, 403);
+      const ownedEvent = await request(own, at, 'PUT', withEvent);
+      assert.equal(ownedEvent.status, 200); saved = ownedEvent.data;
+      assert.equal((await request(own, mt)).data.events[0].title, '帳號行程');
       const audit = await request('/api/admin/audit', mt); assert.ok(audit.data.some((r: { action: string }) => r.action === 'admin.workspace.updated'));
       assert.equal((await request('/api/kpi-rules', at)).data.length, 6);
     });
@@ -97,7 +128,7 @@ test('authenticated API isolation, grants, admin and durable data', async t => {
     });
     await t.test('server restart preserves data and migration is repeatable', async () => {
       await app.close();
-      app = createApi({ database, allowRegistration: false }); app.server.listen(0, '127.0.0.1'); await once(app.server, 'listening');
+      app = createApi<undefined>({ database, allowRegistration: false }); app.server.listen(0, '127.0.0.1'); await once(app.server, 'listening');
       base = `http://127.0.0.1:${(app.server.address() as { port: number }).port}`;
       const result = await request(own, at); assert.equal(result.status, 200); assert.equal(result.data.contacts[0].notes, '管理員修改');
       assert.equal((await request('/api/auth/register', undefined, 'POST', { email: 'closed@example.test', password })).status, 403);

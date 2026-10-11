@@ -1,3 +1,4 @@
+import {DateRangePicker,useDateRange} from '../../ui/DateRangePicker';
 import { reviewContactGrade, needsGradeReview } from '../../domain/tracking';
 import { api, Session } from '../../data/api';
 import * as Crypto from 'expo-crypto';
@@ -5,10 +6,14 @@ import { useEffect, useState } from 'react';
 import { BackHandler, Modal, Pressable, ScrollView, StyleSheet, Text, View, KeyboardAvoidingView, Platform } from 'react-native';
 import { Contact, ContactDraft, Grade, IntervalUnit, createGrade, emptyContact, gradeLabel } from '../../domain/contacts';
 import { creationDate } from '../../domain/followups';
-import { Button, Field, s } from '../../ui/components';
-import { colors as c } from '../../ui/theme';
+import { Button, Field, useStyles } from '../../ui/components';
+import { useColors, Palette } from '../../ui/theme';
 
 export function ContactEditor({ session, contact, grades, saving, onSave, onClose, onAddGrade }: { session: Session; contact?: Contact; grades: Grade[]; saving: boolean; onSave: (draft: ContactDraft, id?: string) => Promise<Contact>; onClose: () => void; onAddGrade: (code: string, amount: number, unit: IntervalUnit) => Promise<void> }) {
+  const s = useStyles();
+  const recordRange=useDateRange();
+  const c = useColors();
+  const styles = makeStyles(c);
   const [draft, setDraft] = useState<ContactDraft>(contact ? { ...contact, importantDates: contact.importantDates.map(d => ({ ...d })) } : emptyContact());
   const [scoreRules, setScoreRules] = useState<{code: string; label: string; points: number}[]>([]);
   useEffect(() => { api<typeof scoreRules>('/api/kpi-rules', session.token).then(setScoreRules).catch(() => setError('無法讀取計分項目，請重新開啟編輯頁。')); }, [session.token]);
@@ -74,16 +79,17 @@ export function ContactEditor({ session, contact, grades, saving, onSave, onClos
           <Text style={s.muted}>選擇既有等級後，按上方「儲存」才會套用至此聯絡人。可在此新增自訂等級。</Text>
         </ScrollView>}
         {section === 'records' && <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24, gap: 18 }}>
-          <Text style={s.title}>{draft.name || '此聯絡人'}的聯絡紀錄</Text>
+          <Text style={s.title}>{draft.name || '此聯絡人'}的聯絡紀錄</Text><DateRangePicker value={recordRange} label="紀錄時段" />
           <Button secondary disabled={saving} onPress={() => { const id = Crypto.randomUUID(); set('records', [{ id, date: creationDate(new Date().toISOString())!, content: '', reviewGrade: '' }, ...(draft.records ?? [])]); setEditingRecord(id); }}>＋ 新增紀錄</Button>
           <Text style={s.muted}>新增、編輯或刪除紀錄後，按上方「儲存」才會保存。</Text>
-          {(draft.records ?? []).map(record => <View key={record.id} style={{ padding: 16, gap: 12, borderRadius: 12, backgroundColor: c.background }}>
+          {(draft.records ?? []).filter(record=>recordRange.contains(record.date)||editingRecord===record.id).map(record => <View key={record.id} style={{ padding: 16, gap: 12, borderRadius: 12, backgroundColor: c.background }}>
             {editingRecord === record.id ? <><Field label="紀錄日期（YYYY-MM-DD）" value={record.date} onChange={date => set('records', draft.records!.map(item => item.id === record.id ? { ...item, date } : item))} />
             <Text style={s.label}>計分項目</Text><View style={s.row}>{[{code: '', label: '不計分', points: 0}, ...scoreRules].map(rule => <Button key={rule.code} secondary={(record.scoreCode ?? '') !== rule.code} disabled={saving} onPress={() => set('records', draft.records!.map(item => item.id === record.id ? {...item, scoreCode: rule.code} : item))}>{rule.label}{rule.code ? ` · ${rule.points} 分` : ''}</Button>)}</View>
             <Field label="紀錄內容" value={record.content} onChange={content => set('records', draft.records!.map(item => item.id === record.id ? { ...item, content } : item))} placeholder="例如：今天電話聯繫，客戶希望下週再討論。" multiline /></> : <><Text style={s.label}>{record.date}</Text><Text style={s.muted}>{record.content || '尚未填寫內容'}</Text></>}
             <View style={s.row}><Button secondary disabled={saving} onPress={() => setEditingRecord(editingRecord === record.id ? null : record.id)}>{editingRecord === record.id ? '完成編輯' : '編輯紀錄'}</Button><Button secondary disabled={saving} onPress={() => setDeletingRecord(record.id)}>刪除紀錄</Button></View>
           </View>)}
-          <Text style={s.muted}>{createdAt ? `${creationDate(createdAt) ?? '日期不明'} · 新增聯絡人` : '儲存聯絡人後，會在此記錄建立日期。'}</Text>
+          {(!createdAt||recordRange.contains(creationDate(createdAt)))&&<Text style={s.muted}>{createdAt ? `${creationDate(createdAt)} · 新增聯絡人` : '儲存聯絡人後，會在此記錄建立日期。'}</Text>}
+          {recordRange.range&&!(draft.records??[]).some(r=>recordRange.contains(r.date)||editingRecord===r.id)&&!recordRange.contains(createdAt?creationDate(createdAt):null)&&<Text style={s.muted}>此時段沒有紀錄。</Text>}
         </ScrollView>}
         {saved && !dirty && <Text accessibilityLiveRegion="polite" style={[s.muted, { padding: 16 }]}>已儲存</Text>}
         {!!error && <Text accessibilityRole="alert" style={[s.error, { padding: 16 }]}>{error}</Text>}
@@ -96,4 +102,4 @@ export function ContactEditor({ session, contact, grades, saving, onSave, onClos
     </KeyboardAvoidingView>
   );
 }
-const styles = StyleSheet.create({ page: { flex: 1, backgroundColor: c.background }, content: { flex: 1, width: '100%', backgroundColor: c.paper }, chip: { padding: 12, borderRadius: 9, backgroundColor: c.pale } });
+const makeStyles = (c: Palette) => StyleSheet.create({ page: { flex: 1, backgroundColor: c.background }, content: { flex: 1, width: '100%', backgroundColor: c.paper }, chip: { padding: 12, borderRadius: 9, backgroundColor: c.pale } });

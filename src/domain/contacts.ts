@@ -2,9 +2,10 @@ import type { TrackingChange } from './tracking';
 export type IntervalUnit = 'day' | 'week' | 'month';
 export type Grade = { code: string; amount: number; unit: IntervalUnit; fixed: boolean };
 export const DEFAULT_GRADES: readonly Grade[] = [
-  { code: 'A', amount: 1, unit: 'week', fixed: true },
-  { code: 'B', amount: 1, unit: 'month', fixed: true },
-  { code: 'C', amount: 3, unit: 'month', fixed: true },
+  { code: 'A', amount: 30, unit: 'day', fixed: false },
+  { code: 'B', amount: 60, unit: 'day', fixed: false },
+  { code: 'C', amount: 90, unit: 'day', fixed: false },
+  { code: 'D', amount: 120, unit: 'day', fixed: false },
 ];
 export type ImportantDate = { id: string; label: string; date: string };
 export type ContactRecord = { id: string; date: string; content: string; scoreCode?: string; reviewGrade?: string };
@@ -28,7 +29,7 @@ export function validateContact(draft: ContactDraft): string | null {
     if (!Array.isArray(draft.trackingHistory) || draft.trackingHistory.length > 1000) return '追蹤歷史無效。';
     const ids = new Set<string>();
     for (const h of draft.trackingHistory) {
-      if (!h || typeof h.id !== 'string' || !h.id || ids.has(h.id) || !['complete','reschedule'].includes(h.kind) || typeof h.at !== 'string' || !isDate(h.at) || (h.from !== null && (typeof h.from !== 'string' || !isDate(h.from))) || (h.to !== null && (typeof h.to !== 'string' || !isDate(h.to))) || (h.undone !== undefined && typeof h.undone !== 'boolean') || (h.recordId !== undefined && typeof h.recordId !== 'string')) return '追蹤歷史無效。';
+      if (!h || typeof h.id !== 'string' || !h.id || ids.has(h.id) || !['complete','reschedule'].includes(h.kind) || typeof h.at !== 'string' || !isDate(h.at) || (h.from !== null && (typeof h.from !== 'string' || !isDate(h.from))) || (h.to !== null && (typeof h.to !== 'string' || !isDate(h.to))) || (h.undone !== undefined && typeof h.undone !== 'boolean') || (h.previousGrade !== undefined && (typeof h.previousGrade !== 'string' || h.previousGrade.length > 100)) || (h.recordId !== undefined && typeof h.recordId !== 'string')) return '追蹤歷史無效。';
       ids.add(h.id);
     }
   }
@@ -74,7 +75,6 @@ export function addInterval(value: string, grade: Grade): string {
 export function createGrade(code: string, amount: number, unit: IntervalUnit, existing: readonly Grade[]): Grade {
   const normalized = code.trim().toUpperCase();
   if (!normalized || [...normalized].length > 20 || /[\u0000-\u001f\u007f]/.test(normalized)) throw new Error('等級名稱請填寫 1–20 個字元。');
-  if (DEFAULT_GRADES.some(g => g.code === normalized)) throw new Error('A、B、C 為固定等級，不能重複新增。');
   if (existing.some(g => g.code === normalized)) throw new Error('這個等級已經存在。');
   if (!Number.isInteger(amount) || amount < 1 || amount > 1200) throw new Error('間隔請填寫 1–1200 的整數。');
   if (!['day', 'week', 'month'].includes(unit)) throw new Error('請選擇有效的間隔單位。');

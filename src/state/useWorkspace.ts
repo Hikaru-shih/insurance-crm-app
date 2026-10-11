@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Crypto from 'expo-crypto';
+import { ScheduleEvent, saveEvent as updateEvents } from '../domain/events';
+import { completeSchedule, EventCompletion } from '../domain/eventCompletion';
 import { ContactDraft, IntervalUnit, createGrade, validateContact } from '../domain/contacts';
 import { emptyWorkspace, localRepository, Workspace, WorkspaceRepository } from '../data/repository';
 
@@ -34,7 +36,7 @@ export function useWorkspace(repository: WorkspaceRepository = localRepository) 
       if (id && !old) throw new Error('找不到這位聯絡人。');
       const now = new Date().toISOString();
       const contact = { ...draft, name: draft.name.trim(), groups: [...new Set(draft.groups.map(g => g.trim()).filter(Boolean))], email: draft.email.trim(), importantDates: draft.importantDates.map(d => ({ ...d, label: d.label.trim() })), id: contactId, createdAt: old?.createdAt ?? now, updatedAt: now };
-      return { ...state, contacts: old ? state.contacts.map(c => c.id === id ? contact : c) : [contact, ...state.contacts] };
+      return { ...state, contacts: old ? state.contacts.map(c => c.id === id ? contact : c) : [contact, ...state.contacts], events:state.events.map(e=>e.contactId===contactId&&e.recordId&&old?.records?.some(r=>r.id===e.recordId)&&!contact.records?.some(r=>r.id===e.recordId)?{...e,completed:false}:e) };
     });
     return current.current.contacts.find(contact => contact.id === contactId)!;
   };
@@ -44,14 +46,13 @@ export function useWorkspace(repository: WorkspaceRepository = localRepository) 
   const updateGrade = async (code: string, amount: number, unit: IntervalUnit) => {
     await commit(state => {
       const old = state.grades.find(g => g.code === code);
-      if (!old || old.fixed) throw new Error('固定等級不可修改。');
+      if (!old) throw new Error('找不到此等級。');
       const grade = createGrade(code, amount, unit, state.grades.filter(g => g.code !== code));
       return {...state, grades: state.grades.map(g => g.code === code ? grade : g)};
     });
   };
   const deleteGrade = async (code: string) => {
     await commit(state => {
-      if (state.grades.find(g => g.code === code)?.fixed) throw new Error('固定等級不可刪除。');
       if (state.contacts.some(c => c.grade === code)) throw new Error('此等級仍被聯絡人使用，請先變更聯絡人的分級。');
       return {...state, grades: state.grades.filter(g => g.code !== code)};
     });
@@ -64,5 +65,8 @@ export function useWorkspace(repository: WorkspaceRepository = localRepository) 
       return { ...legacy, revision: state.revision };
     });
   };
-  return { ...data, loading, loadError, saving, reload, saveContact, addGrade, updateGrade, deleteGrade, importLegacy };
+  const saveEvent = async (event: ScheduleEvent) => { await commit(state => ({ ...state, events: updateEvents(state.events, event) })); return current.current.events.find(e => e.id === event.id)!; };
+  const deleteEvent = async (id: string) => { await commit(state => ({ ...state, events: state.events.filter(e => e.id !== id) })); };
+  const completeEvent=async(event:ScheduleEvent,input:EventCompletion)=>{await commit(state=>completeSchedule(state,event,input));return current.current.events.find(e=>e.id===event.id)!;};
+  return { ...data, loading, loadError, saving, reload, saveContact, addGrade, updateGrade, deleteGrade, importLegacy, saveEvent, deleteEvent, completeEvent };
 }

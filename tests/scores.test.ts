@@ -30,6 +30,11 @@ test('scores use server rules, isolate owners, retry safely, revoke and preserve
     let rows = (await call('/api/scores',a.token)).data;
     assert.equal(rows.length,1); assert.equal(rows[0].points,1);
     assert.deepEqual((await call('/api/scores',b.token)).data,[]);
+    await call('/api/grants',a.token,'POST',{email:ub.email});
+    const shared = await call(`/api/workspaces/${ua.id}/scores`,b.token);
+    assert.equal(shared.status,200); assert.equal(shared.data[0].points,1); assert.equal(shared.data[0].note,'完成聯繫');
+    await call(`/api/grants/${ub.id}`,a.token,'DELETE');
+    assert.equal((await call(`/api/workspaces/${ua.id}/scores`,b.token)).status,403);
     assert.equal((await call('/api/scores/test-one',b.token,'DELETE')).status,404);
     assert.equal((await call('/api/admin/kpi-rules',a.token,'PUT',{code:'contact',points:9})).status,403);
     assert.equal((await call('/api/admin/kpi-rules',admin.token,'PUT',{code:'contact',points:9})).status,200);

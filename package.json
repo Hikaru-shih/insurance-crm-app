@@ -14,14 +14,22 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "test:browser": "playwright test",
-    "build:web": "expo export --platform web"
+    "build:web": "expo export --platform web",
+    "db:backup": "tsx scripts/backup.ts backup",
+    "db:verify": "tsx scripts/backup.ts verify",
+    "db:restore": "tsx scripts/backup.ts restore",
+    "admin:create": "tsx scripts/bootstrap-admin.ts"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.15",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.21",
     "expo-crypto": "~57.0.2",
+    "expo-print": "~57.0.1",
+    "expo-sharing": "~57.0.18",
     "expo-status-bar": "~57.0.1",
+    "nodemailer": "^10.1.0",
+    "pg": "^8.23.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
@@ -29,8 +37,11 @@
     "react-native-web": "^0.21.2"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "^1.63.0",
     "@types/node": "^22.20.2",
+    "@types/nodemailer": "^8.0.2",
+    "@types/pg": "^8.23.1",
     "@types/react": "~19.2.2",
     "tsx": "^4.23.13",
     "typescript": "~6.0.3"

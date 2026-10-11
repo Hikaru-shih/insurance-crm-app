@@ -1,0 +1,35 @@
+import {test,expect} from '@playwright/test';
+import {readdirSync,readFileSync} from 'node:fs';
+import {join} from 'node:path';
+test('App verification and password reset codes work without leaving the screen',async({page,request,baseURL})=>{
+  const api=process.env.TEST_API_URL??'http://127.0.0.1:3002',email=`recovery-${Date.now()}@example.test`,password='Original-browser-password!';
+  expect((await request.post(api+'/api/auth/register',{data:{email,password,name:'驗證測試'}})).status()).toBe(201);
+  const readCode=(subject:string)=>{
+    const directory=process.env.TEST_MAIL_OUTBOX??'.data/mail-outbox';
+    const mails=readdirSync(directory).map(f=>JSON.parse(readFileSync(join(directory,f),'utf8'))).filter(m=>m.to===email&&m.subject.includes(subject));
+    return mails.at(-1)?.text.match(/\b\d{8}\b/)?.[0] as string;
+  };
+  await page.goto(baseURL!);
+  await page.getByRole('button',{name:'信箱驗證／忘記密碼',exact:true}).click();
+  await page.getByLabel('收信 Email',{exact:true}).fill(email);
+  await page.getByRole('button',{name:'申請／重寄驗證信',exact:true}).click();
+  await expect(page.getByRole('alert')).toContainText('若帳號符合條件');
+  await page.getByLabel('8 位數驗證碼',{exact:true}).fill(readCode('驗證信箱'));
+  await page.getByRole('button',{name:'確認驗證信箱',exact:true}).click();
+  await expect(page.getByRole('alert')).toContainText('信箱已驗證');
+  expect(page.url()).not.toContain('token=');
+  await page.getByRole('button',{name:'返回登入',exact:true}).click();
+  await page.getByRole('button',{name:'信箱驗證／忘記密碼',exact:true}).click();
+  await page.getByLabel('收信 Email',{exact:true}).fill(email);
+  await page.getByRole('button',{name:'寄送密碼重設信',exact:true}).click();
+  await expect(page.getByRole('alert')).toContainText('若帳號符合條件');
+  await page.getByLabel('8 位數驗證碼',{exact:true}).fill(readCode('重設密碼'));
+  await page.getByLabel('新密碼（8–128 字元）',{exact:true}).fill('New-browser-password!');
+  await page.getByLabel('再次輸入新密碼',{exact:true}).fill('New-browser-password!');
+  await page.getByRole('button',{name:'確認重設密碼',exact:true}).click();
+  await expect(page.getByRole('alert')).toContainText('密碼已重設');
+  await page.getByRole('button',{name:'返回登入',exact:true}).click();
+  await page.getByLabel('帳號 Email',{exact:true}).fill(email);await page.getByLabel('密碼',{exact:true}).fill('New-browser-password!');
+  await page.getByRole('button',{name:'登入',exact:true}).click();
+  await expect(page.getByRole('button',{name:'開啟功能選單',exact:true})).toBeVisible();
+});

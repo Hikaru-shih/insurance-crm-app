@@ -1,8 +1,8 @@
 import { Contact, Grade, addInterval, isDate } from './contacts';
 import { creationDate } from './followups';
-export type TrackingChange = { id: string; kind: 'reschedule' | 'complete'; from: string | null; to: string | null; at: string; recordId?: string; undone?: boolean };
+export type TrackingChange = { id: string; kind: 'reschedule' | 'complete'; from: string | null; to: string | null; at: string; recordId?: string; previousGrade?: string; undone?: boolean };
 export function nextContactDate(contact: Contact, grades: readonly Grade[]): string | null {
-  if (needsGradeReview(contact)) return null;
+  if (!contact.grade || needsGradeReview(contact)) return null;
   if (contact.nextContactDate !== undefined) return contact.nextContactDate;
   if (contact.followupCompleted) return null;
   const grade = grades.find(g => g.code === contact.grade), start = creationDate(contact.createdAt);
@@ -18,13 +18,13 @@ export function changeTracking(contact: Contact, grades: readonly Grade[], input
   const from = nextContactDate(contact, grades);
   return { ...contact, grade: input.gradeCode || contact.grade, nextContactDate: input.kind === 'complete' && !input.gradeCode ? null : input.next, followupCompleted: false,
     records: input.kind === 'complete' ? [...(contact.records ?? []), { id: input.id, date: input.date, content: input.content!.trim(), scoreCode: input.scoreCode ?? '', reviewGrade: input.gradeCode ?? '' }] : contact.records,
-    trackingHistory: [...(contact.trackingHistory ?? []), { id: input.id, kind: input.kind, from, to: input.next, at: input.date, ...(input.kind === 'complete' ? { recordId: input.id } : {}) }],
+    trackingHistory: [...(contact.trackingHistory ?? []), { id: input.id, kind: input.kind, from, previousGrade: contact.grade, to: input.kind === 'complete' && !input.gradeCode ? null : input.next, at: input.date, ...(input.kind === 'complete' ? { recordId: input.id } : {}) }],
   };
 }
 export function undoTracking(contact: Contact): Contact {
   const history = contact.trackingHistory ?? [], last = [...history].reverse().find(h => !h.undone);
   if (!last) throw new Error('沒有可撤銷的安排。');
-  return { ...contact, nextContactDate: last.from, followupCompleted: false,
+  return { ...contact, grade: last.previousGrade ?? contact.grade, nextContactDate: last.from, followupCompleted: false,
     records: last.recordId ? (contact.records ?? []).filter(r => r.id !== last.recordId) : contact.records,
     trackingHistory: history.map(h => h.id === last.id ? { ...h, undone: true } : h),
   };
@@ -33,10 +33,10 @@ export function undoTracking(contact: Contact): Contact {
 export function needsGradeReview(contact: Pick<Contact, 'records'>): boolean {
   return (contact.records ?? []).some(record => record.reviewGrade === '');
 }
-export function reviewContactGrade<T extends Pick<Contact, 'records' | 'grade' | 'nextContactDate'>>(contact: T, code: string, grades: readonly Grade[]): T {
+export function reviewContactGrade<T extends Pick<Contact, 'records' | 'grade' | 'nextContactDate'>>(contact: T & { createdAt?: string }, code: string, grades: readonly Grade[]): T {
   const grade = grades.find(g => g.code === code);
   if (!grade) throw new Error('請選擇有效分級。');
   const pending = (contact.records ?? []).filter(r => r.reviewGrade === '');
-  const lastDate = pending.map(r => r.date).sort().at(-1);
+  const lastDate = pending.map(r => r.date).sort().at(-1) ?? (!contact.grade && contact.createdAt ? creationDate(contact.createdAt) : null);
   return {...contact, grade: code, records: contact.records?.map(r => r.reviewGrade === '' ? {...r, reviewGrade: code} : r), ...(lastDate ? {nextContactDate: addInterval(lastDate, grade)} : {})};
 }

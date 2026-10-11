@@ -1,0 +1,40 @@
+import { test, expect } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
+
+test('admin leaderboard searches inside names, retains tied ranks and opens employee details',async({page})=>{
+  const email=`board-${Date.now()}@example.test`,password='Leaderboard-browser-password';
+  execFileSync(process.execPath,['--import','tsx','-e',`const {createApi}=require('./server/app.ts');const {creationDate}=require('./src/domain/followups.ts');const app=createApi({database:process.env.TEST_DATABASE_PATH||'.data/browser-test.sqlite'});(async()=>{await app.createUser(process.env.TEST_ADMIN_EMAIL,process.env.TEST_ADMIN_PASSWORD,'admin','排名管理員');for(const [index,name] of ['陳小明排名','林小明排名','王大華排名'].entries()){const u=await app.createUser('board-'+index+'-'+Date.now()+'@example.test',process.env.TEST_ADMIN_PASSWORD,'user',name);app.db.prepare('INSERT INTO score_entries(owner_id,id,date,code,label,points,note) VALUES(?,?,?,?,?,?,?)').run(u.id,'score',creationDate(new Date().toISOString()),'contact','聯繫',index===2?1:10,'');}app.db.close();})().catch(e=>{console.error(e);process.exit(1);});`],{env:{...process.env,TEST_ADMIN_EMAIL:email,TEST_ADMIN_PASSWORD:password}});
+  await page.goto('/');
+  await page.getByLabel('帳號 Email',{exact:true}).fill(email);
+  await page.getByLabel('密碼',{exact:true}).fill(password);
+  await page.getByRole('button',{name:'登入',exact:true}).click();
+  await page.getByRole('button',{name:'開啟功能選單',exact:true}).click(); await page.getByRole('button',{name:'管理後台',exact:true}).click();
+  await expect(page.getByText('員工計分板',{exact:true})).toBeVisible();
+  await page.getByLabel('搜尋員工姓名',{exact:true}).fill('小明');
+  const first=page.getByRole('button',{name:'第 1 名 陳小明排名，10 分，查看資料',exact:true});
+  const second=page.getByRole('button',{name:'第 1 名 林小明排名，10 分，查看資料',exact:true});
+  await expect(first).toBeVisible();await expect(second).toBeVisible();
+  await expect(page.getByRole('button',{name:/第.*王大華排名/})).toHaveCount(0);
+  const a=await first.boundingBox(), b=await second.boundingBox();
+  expect(a!.x).toBe(b!.x);expect(Math.abs(a!.y-b!.y)).toBeGreaterThan(30);
+  await first.click();
+  await expect(page.getByText(/查看帳號：陳小明排名/)).toBeVisible();
+  await page.getByRole('button',{name:'返回帳號列表',exact:true}).click();
+  await page.getByRole('button',{name:'本月',exact:true}).click();
+  await page.getByLabel('搜尋員工姓名',{exact:true}).fill('不存在的姓名');
+  await expect(page.getByText('沒有姓名包含這些字的員工。',{exact:true})).toBeVisible();
+  await page.getByLabel('搜尋員工姓名',{exact:true}).fill('排名');
+  await expect(page.getByRole('button',{name:'第 3 名 王大華排名，1 分，查看資料',exact:true})).toBeVisible();
+  await expect(page.getByText('期間累計分數',{exact:true})).toHaveCount(0);
+
+  const popupPromise=page.waitForEvent('popup');
+  await page.getByRole('button',{name:'匯出 PDF 報表',exact:true}).click();
+  const popup=await popupPromise;
+  await expect(popup.locator('table th').filter({hasText:'帳號'})).toBeVisible();
+  await expect(popup.locator('tbody tr')).toHaveCount(3);
+  await expect(popup.getByText('本表合計',{exact:true})).toHaveCount(0);
+  await popup.emulateMedia({media:'print'});
+  await popup.pdf({path:'test-results/score-report.pdf',preferCSSPageSize:true,printBackground:true});
+  await popup.screenshot({path:'test-results/score-report-preview.png',fullPage:true});
+  await page.screenshot({path:'test-results/leaderboard.png',fullPage:true});
+});

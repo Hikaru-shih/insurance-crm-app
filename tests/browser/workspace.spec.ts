@@ -1,6 +1,43 @@
 import { test, expect, Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 const password = 'Browser-test-password-2026!';
+test('free schedules persist, reschedule, complete, reopen and delete', async ({ page }) => {
+  await register(page);
+  await page.getByRole('button', {name: '＋ 新增行程', exact:true}).click();
+  await page.getByLabel('行程標題', {exact:true}).fill('獨立行程測試');
+  await page.getByLabel('行程時間（選填）', {exact:true}).fill('10:30');
+  await page.getByRole('button', {name:'藍色',exact:true}).click();
+  await page.getByRole('button', {name:'儲存',exact:true}).click();
+  await expect(page.getByText('已儲存',{exact:true})).toBeVisible();
+  await page.getByRole('button', {name:'返回',exact:true}).click();
+  await page.reload();
+  await expect(page.getByText('獨立行程測試',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'查看／處理行程',exact:true}).click();
+  await page.getByLabel('行程日期（留空表示未定）',{exact:true}).fill('');
+  await page.getByRole('button',{name:'返回',exact:true}).click();
+  await expect(page.getByText('尚有未儲存的修改',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'繼續編輯',exact:true}).click();
+  await page.getByRole('button',{name:'儲存',exact:true}).click();
+  await expect(page.getByText('已儲存',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'返回',exact:true}).click();
+  await page.getByRole('button',{name:'◷ 未定行程，1 筆未完成',exact:true}).click();
+  await page.getByRole('button',{name:'獨立行程測試 · 安排日期',exact:true}).click();
+  await page.getByRole('button',{name:'標記完成',exact:true}).click();
+  await page.getByRole('button',{name:'儲存',exact:true}).click();
+  await expect(page.getByText('已儲存',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'返回',exact:true}).click();
+  await expect(page.getByRole('button',{name:'◷ 未定行程',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'⌂ 主頁',exact:true}).click();
+  await page.getByRole('button',{name:'獨立行程測試（已完成）',exact:true}).click();
+  await page.getByRole('button',{name:'改為未完成',exact:true}).click();
+  await page.getByRole('button',{name:'儲存',exact:true}).click();
+  await expect(page.getByText('已儲存',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'刪除行程',exact:true}).click();
+  await page.getByRole('button',{name:'確認刪除',exact:true}).click();
+  await page.reload();
+  await expect(page.getByRole('button',{name:'◷ 未定行程',exact:true})).toBeVisible();
+  await expect(page.getByText('獨立行程測試',{exact:true})).toHaveCount(0);
+});
 async function register(page: Page) {
   const email = `browser-${Date.now()}-${Math.random().toString(36).slice(2)}@example.test`;
   await page.goto('/');
@@ -9,7 +46,7 @@ async function register(page: Page) {
   await page.getByLabel('帳號 Email', { exact: true }).fill(email);
   await page.getByLabel('密碼', { exact: true }).fill(password);
   await page.getByRole('button', { name: '建立帳號並登入', exact: true }).click();
-  await expect(page.getByRole('button', { name: '登出', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '開啟功能選單', exact: true })).toBeVisible();
   return email;
 }
 
@@ -43,16 +80,14 @@ test('login, latest contact fields, persistence, search and logout', async ({ pa
   await page.getByRole('button', { name: '查看我的聯絡人 →' }).click();
   await page.getByLabel('搜尋聯絡人', { exact: true }).fill('同事');
   await page.getByRole('button', { name: '查看 新版測試客戶', exact: true }).click();
-  await expect(page.getByText('已儲存', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '返回上一頁', exact: true }).click();
   await expect(page.getByText('1995-05-20', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '⚙ 分級' }).click();
-  await expect(page.getByText('固定，不可修改', { exact: true })).toHaveCount(3);
+  await expect(page.getByRole('button', {name:'修改',exact:true})).toHaveCount(4);
   await page.getByLabel('等級名稱', { exact: true }).fill('VIP客戶');
   await page.getByLabel('聯絡間隔', { exact: true }).fill('2');
   await page.getByRole('button', { name: '新增等級', exact: true }).click();
-  await expect(page.getByText('自訂等級', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '登出', exact: true }).click();
+  await expect(page.getByRole('button', {name:'修改',exact:true})).toHaveCount(5);
+  await page.getByRole('button',{name:'開啟功能選單',exact:true}).click(); await page.getByRole('button', { name: '登出', exact: true }).click();
   await expect(page.getByRole('button', { name: '登入', exact: true })).toBeVisible();
   await expect(page.getByText('新版測試客戶', { exact: true })).toHaveCount(0);
   if (await page.getByLabel('姓名（必填）', {exact:true}).count()) await page.getByLabel('姓名（必填）', {exact:true}).fill('瀏覽器測試');
@@ -90,15 +125,15 @@ test('desktop and narrow layouts render without overflow', async ({ page }) => {
 
 test('admin login exposes account and audit skeleton', async ({ page }) => {
   const email = `admin-${Date.now()}@example.test`;
-  execFileSync(process.execPath, ['--import', 'tsx', '-e', "const {createApi}=require('./server/app.ts'); const app=createApi({database:'.data/browser-test.sqlite'}); app.createUser(process.env.TEST_ADMIN_EMAIL,process.env.TEST_ADMIN_PASSWORD,'admin').then(()=>app.db.close()).catch(()=>process.exit(1));"], { env: { ...process.env, TEST_ADMIN_EMAIL: email, TEST_ADMIN_PASSWORD: password } });
+  execFileSync(process.execPath, ['--import', 'tsx', '-e', "const {createApi}=require('./server/app.ts'); const app=createApi({database:process.env.TEST_DATABASE_PATH||'.data/browser-test.sqlite'}); app.createUser(process.env.TEST_ADMIN_EMAIL,process.env.TEST_ADMIN_PASSWORD,'admin').then(()=>app.db.close()).catch(()=>process.exit(1));"], { env: { ...process.env, TEST_ADMIN_EMAIL: email, TEST_ADMIN_PASSWORD: password } });
   await page.goto('/');
   if (await page.getByLabel('姓名（必填）', {exact:true}).count()) await page.getByLabel('姓名（必填）', {exact:true}).fill('瀏覽器測試');
   await page.getByLabel('帳號 Email', { exact: true }).fill(email);
   await page.getByLabel('密碼', { exact: true }).fill(password);
   await page.getByRole('button', { name: '登入', exact: true }).click();
-  await page.getByRole('button', { name: '管理後台', exact: true }).click();
+  await page.getByRole('button',{name:'開啟功能選單',exact:true}).click(); await page.getByRole('button', { name: '管理後台', exact: true }).click();
   await expect(page.getByText('管理後台 · 帳號與紀錄', { exact: true })).toBeVisible();
-  await expect(page.getByText(`${email} · 管理員`, { exact: true })).toBeVisible();
+  await expect(page.getByRole('button').filter({hasText:email})).toBeVisible();
   await expect(page.getByText('最近操作', { exact: true })).toBeVisible();
 });
 
@@ -116,7 +151,7 @@ test('record button is visible and records persist after saving', async ({ page 
   await page.getByRole('button', { name: '查看 紀錄驗證', exact: true }).click();
   await page.getByRole('button', { name: '編輯聯絡人', exact: true }).click();
   await page.getByRole('button', { name: '紀錄', exact: true }).click();
-  await expect(page.getByText('已電話聯絡，下週再約。', { exact: true })).toBeVisible();
+  await expect(page.getByText('已電話聯絡，下週再約。', { exact: true }).filter({visible:true})).toBeVisible();
   await page.getByRole('button', { name: '編輯紀錄', exact: true }).click();
   await page.getByLabel('紀錄內容', { exact: true }).fill('已改約下個月');
   await page.getByRole('button', { name: '完成編輯', exact: true }).click();
@@ -162,4 +197,32 @@ test('tracking completion, undo and archive work from contact details', async ({
   await page.getByRole('button',{name:'恢復聯絡人',exact:true}).click();
   await page.getByRole('button',{name:'確認恢復',exact:true}).click();
   await expect(page.getByRole('button',{name:'完成聯絡並安排下次',exact:true})).toBeVisible();
+});
+test('regrading pending badge survives reload and clears after review', async ({page}) => {
+  const recordDate=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Taipei'});
+  const nextDate=new Date(recordDate+'T12:00:00Z');nextDate.setUTCDate(nextDate.getUTCDate()+30);
+  await register(page);
+  await page.getByRole('button',{name:'＋ 新增聯絡人',exact:true}).first().click();
+  await page.getByLabel('姓名（必填）',{exact:true}).fill('重新分級驗證');
+  await page.getByRole('button',{name:'分級',exact:true}).click();
+  await page.getByRole('button',{name:/^A ·/}).click();
+  await page.getByRole('button',{name:'紀錄',exact:true}).click();
+  await page.getByRole('button',{name:'＋ 新增紀錄',exact:true}).click();
+  await page.getByLabel('紀錄日期（YYYY-MM-DD）',{exact:true}).fill(recordDate);
+  await page.getByLabel('紀錄內容',{exact:true}).fill('聯繫但尚未分級');
+  await page.getByRole('button',{name:'儲存',exact:true}).click();
+  await expect(page.getByText('已儲存',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'返回上一頁',exact:true}).click();
+  await expect(page.getByRole('button',{name:'◷ 未定行程，1 筆未完成',exact:true})).toBeVisible();
+  await page.reload();
+  await page.getByRole('button',{name:'◷ 未定行程，1 筆未完成',exact:true}).click();
+  await page.getByRole('button',{name:'重新分級驗證 · 待重新分級',exact:true}).click();
+  await page.getByRole('button',{name:'確認分級 A',exact:true}).click();
+  await expect(page.getByText(`下次聯絡：${nextDate.toISOString().slice(0,10)}`,{exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'◷ 未定行程',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'編輯紀錄',exact:true}).click();
+  await page.getByLabel('紀錄內容',{exact:true}).fill('編輯內容，不重設分級');
+  await page.getByRole('button',{name:'儲存紀錄',exact:true}).click();
+  await expect(page.getByText('編輯內容，不重設分級',{exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'◷ 未定行程',exact:true})).toBeVisible();
 });

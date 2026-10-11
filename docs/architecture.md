@@ -1,3 +1,11 @@
+## 2026-10-11：App 驗證碼
+
+正式入口統一寄送 8 位數驗證碼，不需要 PUBLIC_APP_URL。account_tokens 新增 attempts（SQLite 6／PostgreSQL 2），錯誤嘗試以交易寫入、重設及消耗 token 以交易保存；登入建立 session 前重查密碼雜湊，避免與改密碼競爭時發出舊密碼的新 session。寄信冷卻在交易內重查，避免並行重寄。來源與帳號均有限流；驗證碼失敗次數保存在資料庫，程序重啟不重設。正式部署仍待服務設定與驗收。
+
+## 2026-10-10：PostgreSQL 更新
+
+正式架構為 Android／iOS App → HTTPS API → PostgreSQL，PC 僅供預覽。server/postgres.ts 管理連線池與 migration，server/asyncDatabase.ts 統一非同步查詢。交易使用同一連線，PostgreSQL advisory transaction lock 序列化 API 寫入，保留版本衝突與紀錄／積分一起回復的行為；高流量時需再調整鎖定粒度。正式環境必須設定 DATABASE_URL，不匯入本機資料。App 驗證流程及 Render 驗收尚未完成，見 [部署步驟](render-app.md)。以下早期進度供歷史參考。
+
 # 實作架構與啟動方式
 
 更新：2026-09-22｜版本：0.2 本機前後端
@@ -64,3 +72,18 @@ Web、Android 與 iOS JS/Hermes 匯出已成功；原生二進位建置及實機
 9/10 npm audit 曾回報 10 個 moderate 項目，源自 Expo 工具鏈 xcode → uuid；未執行會降級 SDK 的 audit fix --force。正式原生發布前仍需追蹤上游修正。現有密碼與工作階段使用 Node crypto，App ID 使用 expo-crypto。
 
 參考：[Expo 專案](https://docs.expo.dev/get-started/create-a-project/)、[TypeScript](https://docs.expo.dev/guides/typescript/)、[Node SQLite](https://nodejs.org/api/sqlite.html)。
+
+
+## 後台帳號管理（2026-10-04）
+
+POST /api/admin/users 建立帳號，PUT /api/admin/users/:id 修改姓名、role 與 active。伺服器限制管理員，自我停用與降權禁止，停用／變更角色立即刪除該帳號 sessions，保留 workspace。變更写入 audit_log。後台編輯既有資料沿用 workspace PUT 的版本檢查及交易計分；KPI 表單沿用 /api/admin/kpi-rules。沒有新增 schema migration；更新後重啟 API 服務。
+
+
+## 唯讀分享（2026-10-04）
+
+GET /api/shared-with-me 列出本人收到的啟用帳號授權，GET /api/grants 列出本人授予的對象姓名與 Email。POST /api/grants 僅授權本人的資料；DELETE /api/grants/:viewerId 撤銷。GET /api/workspaces/:ownerId/scores 使用相同資料存取檢查；一般被授權者只有讀取權。分享詳情沿用 AccountDetails 的 readOnly 模式，隱藏管理及編輯功能，伺服器獨立驗證權限。SharingScreen 每 15 秒更新授權狀態，撤銷／停用移除已開啟詳情。無 schema 變更，需重啟 API 套用新路由。
+
+
+## 2026-10-05 資料與帳號更新
+
+Schema v5 新增 email_verified_at 與 account_tokens。正式環境強制 Email 驗證，開發可選；一次性驗證／重設連結以雜湊保存，重設撤銷全帳號 session。實際密碼重設依寄信服務控制權完成，非管理員代查密碼。MAIL_MODE=local 的信件只寫 .data/mail-outbox；正式模式要求 HTTPS 與 Resend 設定。部署與初始化參見 [deployment.md](deployment.md)，備份與新檔還原參見 [backup-and-restore.md](backup-and-restore.md)。

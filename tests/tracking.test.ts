@@ -13,15 +13,15 @@ test('completion creates one record and next followup, persists and undo restore
   const persisted=parseWorkspace({...emptyWorkspace(),contacts:[done]}).contacts[0];
   assert.equal(contactFollowups([persisted],DEFAULT_GRADES).length,1);
   const undone=undoTracking(persisted);
-  assert.equal(nextContactDate(undone,DEFAULT_GRADES),'2026-09-27');
+  assert.equal(nextContactDate(undone,DEFAULT_GRADES),'2026-10-20');
   assert.equal(undone.records?.length,0);
   assert.equal(undone.trackingHistory?.[0].undone,true);
 });
 test('rescheduling keeps history, supports undated and archive, and validates completion',()=>{
   const moved=changeTracking(contact,DEFAULT_GRADES,{id:'move',kind:'reschedule',date:'2026-09-30',next:null});
   assert.deepEqual(contactFollowups([moved],DEFAULT_GRADES),[]);
-  assert.equal(moved.trackingHistory?.[0].from,'2026-09-27');
-  assert.equal(nextContactDate(undoTracking(moved),DEFAULT_GRADES),'2026-09-27');
+  assert.equal(moved.trackingHistory?.[0].from,'2026-10-20');
+  assert.equal(nextContactDate(undoTracking(moved),DEFAULT_GRADES),'2026-10-20');
   assert.deepEqual(contactFollowups([{...contact,archived:true}],DEFAULT_GRADES),[]);
   assert.throws(()=>changeTracking(contact,DEFAULT_GRADES,{id:'bad',kind:'complete',date:'2026-09-30',next:'2026-09-29',content:'內容'}));
   assert.throws(()=>parseWorkspace({...emptyWorkspace(),contacts:[{...contact,nextContactDate:'2026-02-30'}]}));
@@ -33,9 +33,29 @@ test('each new contact requires explicit regrading, including the same grade',()
   assert.equal(nextContactDate(done,DEFAULT_GRADES),null);
   const reviewed=reviewContactGrade(done,'A',DEFAULT_GRADES);
   assert.equal(needsGradeReview(reviewed),false);
-  assert.equal(nextContactDate(reviewed,DEFAULT_GRADES),'2026-10-07');
+  assert.equal(nextContactDate(reviewed,DEFAULT_GRADES),'2026-10-30');
   const again=changeTracking(reviewed,DEFAULT_GRADES,{id:'again',kind:'complete',date:'2026-10-01',next:null,content:'再次聯絡'});
   assert.equal(needsGradeReview(again),true);
-  assert.equal(nextContactDate(undoTracking(again),DEFAULT_GRADES),'2026-10-07');
+  assert.equal(nextContactDate(undoTracking(again),DEFAULT_GRADES),'2026-10-30');
   assert.equal(needsGradeReview({...contact, records:[{id:'legacy',date:'2026-09-20',content:'舊紀錄'}]}),false);
+});
+test('undo restores the previous grade and deleting an unreviewed record clears pending',()=>{
+  const changed=changeTracking(contact,DEFAULT_GRADES,{id:'new-grade',kind:'complete',date:'2026-10-03',next:'2026-11-03',content:'聯絡',gradeCode:'B'});
+  assert.equal(changed.grade,'B');
+  const undo=undoTracking(changed);
+  assert.equal(undo.grade,'A');
+  assert.equal(nextContactDate(undo,DEFAULT_GRADES),'2026-10-20');
+  const unreviewed={...contact,records:[{id:'pending',date:'2026-10-03',content:'尚未分級',reviewGrade:''}]};
+  assert.equal(needsGradeReview(unreviewed),true);
+  assert.equal(needsGradeReview({...unreviewed,records:[]}),false);
+  const reviewed=reviewContactGrade(unreviewed,'A',DEFAULT_GRADES);
+  assert.equal(nextContactDate(reviewed,DEFAULT_GRADES),'2026-11-02');
+  assert.deepEqual(reviewContactGrade(reviewed,'A',DEFAULT_GRADES),reviewed);
+});
+test('initial ungraded contact can be graded from pending and schedules from creation',()=>{
+  const ungraded={...contact,grade:''};
+  assert.equal(nextContactDate(ungraded,DEFAULT_GRADES),null);
+  const graded=reviewContactGrade(ungraded,'A',DEFAULT_GRADES);
+  assert.equal(graded.grade,'A');
+  assert.equal(nextContactDate(graded,DEFAULT_GRADES),'2026-10-20');
 });

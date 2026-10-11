@@ -1,0 +1,15 @@
+import {useState} from 'react';
+import {Pressable,Text,View} from 'react-native';
+import {useColors} from './theme';
+import {Button,useStyles} from './components';
+export function CalendarDatePicker({value,onSelect}:{value:string;onSelect:(date:string)=>void}){
+ const c=useColors(),s=useStyles();const [year,setYear]=useState(Number(value.slice(0,4))),[month,setMonth]=useState(Number(value.slice(5,7)));
+ const [mode,setMode]=useState<'days'|'months'|'years'>('days'),[decade,setDecade]=useState(Math.floor(Number(value.slice(0,4))/10)*10);
+ const key=(day:number)=>`${String(year).padStart(4,'0')}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+ const first=new Date(key(1)+'T12:00:00Z'),last=new Date(first);last.setUTCMonth(last.getUTCMonth()+1);last.setUTCDate(0);
+ const shift=(delta:number)=>{const next=new Date(first);next.setUTCMonth(next.getUTCMonth()+delta);if(next.getUTCFullYear()<1||next.getUTCFullYear()>9999)return;setYear(next.getUTCFullYear());setMonth(next.getUTCMonth()+1);};
+ return <View style={{padding:12,borderWidth:1,borderColor:c.line,borderRadius:12,backgroundColor:c.paper,gap:12,maxWidth:440}}>
+ <View style={s.row}><Button secondary onPress={()=>shift(-1)}>上個月</Button><Button secondary onPress={()=>{setDecade(Math.floor(year/10)*10);setMode(mode==='years'?'days':'years');}}>{year} 年</Button><Button secondary onPress={()=>setMode(mode==='months'?'days':'months')}>{month} 月</Button><Button secondary onPress={()=>shift(1)}>下個月</Button></View>
+ {mode==='years'?<><View style={s.row}><Button secondary disabled={decade<=0} onPress={()=>setDecade(d=>d-10)}>前十年</Button><Button secondary disabled={decade>=9990} onPress={()=>setDecade(d=>d+10)}>後十年</Button></View><View style={{flexDirection:'row',flexWrap:'wrap'}}>{Array.from({length:10},(_,i)=>decade+i).filter(y=>y>=1&&y<=9999).map(y=><Pressable key={y} accessibilityRole="button" accessibilityLabel={`選擇 ${y} 年`} onPress={()=>{setYear(y);setMode('months');}} style={{width:'25%',padding:14}}><Text style={s.label}>{y}</Text></Pressable>)}</View></>:mode==='months'?<View style={{flexDirection:'row',flexWrap:'wrap'}}>{Array.from({length:12},(_,i)=>i+1).map(m=><Pressable key={m} accessibilityRole="button" accessibilityLabel={`選擇 ${m} 月`} onPress={()=>{setMonth(m);setMode('days');}} style={{width:'25%',padding:14}}><Text style={s.label}>{m} 月</Text></Pressable>)}</View>:<><View style={{flexDirection:'row'}}>{['日','一','二','三','四','五','六'].map(d=><Text key={d} style={[s.muted,{width:'14.2857%',textAlign:'center'}]}>{d}</Text>)}</View><View style={{flexDirection:'row',flexWrap:'wrap'}}>{Array.from({length:first.getUTCDay()+last.getUTCDate()},(_,i)=>i-first.getUTCDay()+1).map((day,index)=>day<1?<View key={'blank'+index} style={{width:'14.2857%'}}/>:<Pressable key={day} accessibilityRole="button" accessibilityLabel={`選擇日期 ${key(day)}`} accessibilityState={{selected:value===key(day)}} onPress={()=>onSelect(key(day))} style={{width:'14.2857%',minHeight:44,alignItems:'center',justifyContent:'center',backgroundColor:value===key(day)?c.pale:c.paper,borderRadius:8}}><Text style={s.label}>{day}</Text></Pressable>)}</View></>}
+ </View>;
+}
