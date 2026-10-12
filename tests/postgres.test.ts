@@ -96,5 +96,12 @@ test('PostgreSQL schema, API isolation, atomic scores, leaderboard and recovery'
     assert.equal((await call('/api/auth/reset-password', '', 'POST', resetBody)).status, 200);
     assert.equal((await call('/api/auth/reset-password', '', 'POST', resetBody)).status, 400);
     assert.equal((await call('/api/auth/me', at)).status, 401);
+    const deletionLogin = await call('/api/auth/login', '', 'POST', {email:a.email,password:resetBody.password});
+    assert.equal(deletionLogin.status,200);
+    assert.equal((await call('/api/auth/account', deletionLogin.data.token, 'DELETE', {password:resetBody.password,confirmation:'永久刪除'})).status,200);
+    assert.equal((await call('/api/auth/me', deletionLogin.data.token)).status,401);
+    assert.equal((await db.prepare('SELECT id FROM users WHERE id=?').all(a.id)).length,0);
+    assert.equal((await db.prepare('SELECT owner_id FROM score_entries WHERE owner_id=?').all(a.id)).length,0);
+    assert.ok(await db.prepare('SELECT id FROM users WHERE id=?').get(b.id));
   } finally { await app.close(); }
 });

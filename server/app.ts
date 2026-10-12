@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
+import { publicPage } from './publicPages';
 import { sqliteAsync, AsyncDatabase } from './asyncDatabase';
 import { queryRange } from '../src/domain/dateRange';
 import { syncRecordScores, syncContactCreationScores } from './recordScores';
@@ -141,6 +142,12 @@ export function createApi<T extends AsyncDatabase | undefined = undefined>(optio
                 return;
             }
             const path = new URL(req.url ?? '/', 'http://localhost').pathname;
+            const page = req.method === 'GET' ? publicPage(path) : undefined;
+            if (page) {
+                res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store' });
+                res.end(page);
+                return;
+            }
             if (path === '/api/health' && req.method === 'GET') {
                 await db.prepare('SELECT 1 FROM report_settings WHERE id=1').get();
                 json(res, 200, { ok: true, schema: db.kind === 'postgres' ? 2 : 6, database: db.kind });
@@ -256,6 +263,26 @@ export function createApi<T extends AsyncDatabase | undefined = undefined>(optio
                 return;
             }
             const { user, token } = (await authenticated(req));
+            if (path === '/api/auth/account' && req.method === 'DELETE') {
+                const input = await body(req);
+                rateLimit(req, user.email);
+                if (input.confirmation !== '永久刪除' || typeof input.password !== 'string' || input.password.length > 128)
+                    fail(400, '請輸入目前密碼及「永久刪除」確認文字');
+                if (!await verifyPassword(input.password, user.password_hash)) fail(400, '密碼不正確');
+                await transaction(async () => {
+                    const current = await db.prepare('SELECT password_hash FROM users WHERE id=?').get(user.id);
+                    if (!current || current.password_hash !== user.password_hash) fail(401, '帳號資訊已更新，請重新登入');
+                    await db.prepare('DELETE FROM sessions WHERE user_id=?').run(user.id);
+                    await db.prepare('DELETE FROM account_tokens WHERE user_id=?').run(user.id);
+                    await db.prepare('DELETE FROM grants WHERE owner_id=? OR viewer_id=?').run(user.id, user.id);
+                    await db.prepare('DELETE FROM score_entries WHERE owner_id=?').run(user.id);
+                    await db.prepare('DELETE FROM workspaces WHERE owner_id=?').run(user.id);
+                    await db.prepare('DELETE FROM audit_log WHERE actor_id=? OR target_id=?').run(user.id, user.id);
+                    await db.prepare('DELETE FROM users WHERE id=?').run(user.id);
+                });
+                json(res, 200, { ok: true });
+                return;
+            }
             if (path === '/api/scores/rank' && req.method === 'GET') {
                 const selection = queryRange(new URL(req.url!, 'http://localhost').searchParams, ((await db.prepare('SELECT period FROM report_settings WHERE id=1').get()) as {
                     period: 'week' | 'month';

@@ -1,5 +1,17 @@
 # App 雲端部署：Render API + PostgreSQL
 
+## 2026-10-12 上架補充：政策與帳號刪除
+
+- 已加入公開頁面 `/privacy`（隱私權政策）、`/support`（支援）。營運者施品光，客服 qianmai1011@gmail.com；修改 `server/publicPages.ts` 後重新部署即可更新。
+- 登入畫面及帳號安全提供政策與支援連結。帳號安全可輸入目前密碼與「永久刪除」確認文字，永久刪除自己的帳號、工作資料、分數、授權、驗證碼及登入狀態。停用帳號仍是另一項管理操作。
+- 先提交並推送這次程式變更，等待 Render 部署成功，再以未登入瀏覽器確認以下兩頁可開啟：
+  - `https://qianmai-api.onrender.com/privacy`
+  - `https://qianmai-api.onrender.com/support`
+- Apple 後台的隱私權政策 URL 填前者，支援 URL 填後者；目前本機完成不代表雲端已更新。
+- API 部署後需重新執行 `npx.cmd eas-cli@latest build --platform ios --profile production`，完成後 `npx.cmd eas-cli@latest submit --platform ios --profile production`，選新建置版本；舊的 1.0.0 (2) 不含此功能。
+- 用專用測試帳號驗證刪除與重新登入失敗，勿刪除正式管理員。管理員若需刪除自己，先安排其他管理員接手。
+- 仍需實機驗收、商店截圖、核對資料收集聲明與政策內容，再送審。本次不會自動部署或送審。
+
 更新：2026-10-11。正式產品為 Android／iOS App，PC 網頁只供開發預覽。Render 的 Web Service 用來執行手機呼叫的 API，不需要另外發布網站。
 
 ## 目前已完成

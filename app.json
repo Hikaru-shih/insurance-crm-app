@@ -2,10 +2,32 @@
   "expo": {
     "name": "錢脈",
     "slug": "qianmai",
-    "version": "0.1.0",
+    "icon": "./Logo/Logo.png",
+    "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "web": { "bundler": "metro", "output": "single", "name": "錢脈｜業務工作台" },
-    "ios": { "supportsTablet": true }
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "name": "錢脈｜業務工作台"
+    },
+    "ios": {
+      "bundleIdentifier": "com.hikarucom.qianmai",
+      "buildNumber": "2",
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.qianmai.preview",
+      "versionCode": 2
+    },
+    "extra": {
+      "eas": {
+        "projectId": "f8b2da30-69cd-4cd3-a140-f102f3ae033e"
+      }
+    },
+    "owner": "hikarucom"
   }
 }

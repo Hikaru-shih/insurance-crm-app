@@ -1,0 +1,26 @@
+{
+  "cli": { "appVersionSource": "local" },
+  "build": {
+    "production": {
+      "distribution": "store",
+      "environment": "production",
+      "node": "24.21.0",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://qianmai-api.onrender.com"
+      },
+      "ios": { "autoIncrement": true }
+    },
+    "preview": {
+      "distribution": "internal",
+      "environment": "preview",
+      "node": "24.21.0",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://qianmai-api.onrender.com"
+      },
+      "android": { "buildType": "apk" }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
