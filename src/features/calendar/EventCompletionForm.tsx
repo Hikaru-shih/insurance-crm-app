@@ -1,3 +1,4 @@
+import { ContactInterval } from '../../ui/ContactInterval';
 import {useEffect,useRef,useState} from 'react';
 import * as Crypto from 'expo-crypto';
 import {Modal,ScrollView,Text,View} from 'react-native';
@@ -20,7 +21,7 @@ export function EventCompletionForm({event,grades,session,saving,onSave,onCancel
     <Field label="行程聯絡內容" multiline value={content} onChange={setContent}/>
     <Text style={s.label}>計分項目</Text><View style={s.row}>{[{code:'',label:'不計分',points:0},...rules].map(rule=><Button key={rule.code} secondary={scoreCode!==rule.code} disabled={saving} onPress={()=>setScore(rule.code)}>{rule.label} · {rule.points} 分</Button>)}</View>{!!rulesError&&<Text style={s.error}>{rulesError}</Text>}
     <Text style={s.label}>本次重新分級（沿用原等級也請選一次）</Text><View style={s.row}><Button disabled={saving} secondary={gradeCode!==''} onPress={()=>{setGrade('');setNext('');}}>稍後分級</Button>{grades.map(g=><Button key={g.code} disabled={saving} secondary={gradeCode!==g.code} onPress={()=>{setGrade(g.code);try{setNext(addInterval(date,g));}catch{}}}>{g.code}</Button>)}</View>
-    <Text style={s.muted}>未選分級仍可保存紀錄與計分，聯絡人會列入未定行程。</Text>{!!gradeCode&&<Field label="下次聯絡日期（留空為未定）" value={next} onChange={setNext}/>}
+    {!!gradeCode&&<ContactInterval base={date} next={next} onChange={setNext}/>}<Text style={s.muted}>未選分級仍可保存紀錄與計分，聯絡人會列入未定行程。</Text>{!!gradeCode&&<Field label="下次聯絡日期（留空為未定）" value={next} onChange={setNext}/>}
     {!!error&&<Text accessibilityRole="alert" style={s.error}>{error}</Text>}<Button disabled={saving} onPress={()=>void submit()}>儲存完成與聯絡紀錄</Button><Button secondary disabled={saving} onPress={()=>{if(lock.current||saving)return;lock.current=true;void onOnly().catch(e=>setError(e instanceof Error?e.message:'儲存失敗')).finally(()=>{lock.current=false;});}}>僅完成行程，不新增聯絡紀錄</Button><Button secondary disabled={saving} onPress={onCancel}>取消完成</Button>
   </Card></ScrollView></Modal>;
 }

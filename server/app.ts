@@ -2,7 +2,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { publicPage } from './publicPages';
 import { sqliteAsync, AsyncDatabase } from './asyncDatabase';
 import { queryRange } from '../src/domain/dateRange';
-import { syncRecordScores, syncContactCreationScores } from './recordScores';
+import { syncRecordScores } from './recordScores';
 import { reportRange } from '../src/domain/reporting';
 import { creationDate } from '../src/domain/followups';
 import type { Mailer } from './mail';
@@ -381,7 +381,7 @@ export function createApi<T extends AsyncDatabase | undefined = undefined>(optio
                     try {
                         const before = parseWorkspace(JSON.parse(prior.data));
                         (await syncRecordScores(db, owner, before, next));
-                        (await syncContactCreationScores(db, owner, before, next));
+
                     }
                     catch (e) {
                         fail(400, e instanceof Error ? e.message : '紀錄計分失敗');

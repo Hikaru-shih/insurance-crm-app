@@ -1,6 +1,8 @@
+import { Brand } from './src/ui/Brand';
 import { AppMenu } from './src/features/settings/AppMenu';
 import { AccountSecurity } from './src/features/auth/AccountSecurity';
-import { ThemeProvider } from './src/ui/theme';
+import { ThemeProvider, useTheme } from './src/ui/theme';
+import * as SplashScreen from 'expo-splash-screen';
 import { AppearanceScreen } from './src/features/settings/AppearanceScreen';
 import { SharingScreen } from './src/features/sharing/SharingScreen';
 import { accountLink } from './src/features/auth/AccountRecovery';
@@ -35,8 +37,11 @@ const tabs = [
   { key: 'pending', label: '未定行程', symbol: '◷', subtitle: '還沒決定日期，也不會忘記。' },
 ] as const;
 type Tab = typeof tabs[number]['key'] | 'admin' | 'sharing' | 'appearance' | 'security';
+void SplashScreen.preventAutoHideAsync().catch(()=>{});
 export default function App(){return <ThemeProvider><AppContent /></ThemeProvider>;}
 function AppContent() {
+  const {ready}=useTheme();
+  useEffect(()=>{if(ready)void SplashScreen.hideAsync().catch(()=>{});},[ready]);
   const [authKey,setAuthKey]=useState(0);
   const [session, setSession] = useState<Session | null>(()=>accountLink()?null:savedSession());
   useEffect(()=>{
@@ -86,7 +91,7 @@ function WorkspaceApp({ session, onExpired }: { session: Session; onExpired: () 
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: wide ? 36 : 18, gap: 24 }}>
       <View style={[s.row, { justifyContent: 'space-between' }]}><View style={s.row}><Pressable accessibilityRole="button" accessibilityLabel="開啟功能選單" onPress={()=>setMenuOpen(true)} style={{padding:12,gap:5}}>{[0,1,2].map(n=><View key={n} style={{width:22,height:2,backgroundColor:c.ink}} />)}</Pressable><View style={{ gap: 7 }}>{tab === 'calendar' ? <Text style={styles.heading}>錢脈</Text> : <><Text style={styles.eyebrow}>錢脈 · QIANMAI</Text><Text style={styles.heading}>{currentTab.label}</Text><Text style={s.muted}>{currentTab.subtitle}</Text></>}</View></View><Button disabled={workspace.loading || !!workspace.loadError} onPress={add}>＋ 新增聯絡人</Button></View>
       {!!accountError && <Text accessibilityRole="alert" style={s.muted}>{accountError}</Text>}
-      {workspace.loading ? <ActivityIndicator size="large" color={c.green} /> : workspace.loadError ? <Card><Text style={s.error}>{workspace.loadError}</Text><Button onPress={() => void workspace.reload()}>重試讀取</Button></Card> : <>
+      {workspace.loading ? <Brand loading /> : workspace.loadError ? <Card><Text style={s.error}>{workspace.loadError}</Text><Button onPress={() => void workspace.reload()}>重試讀取</Button></Card> : <>
         {tab === 'calendar' && <View style={{ flexDirection: wide ? 'row' : 'column', gap: 24 }}><View style={{ flex: 1 }}><CalendarScreen onAddEvent={addEvent} onComplete={openEvent} events={[...contactFollowups(workspace.contacts, workspace.grades), ...datedEvents]} onAddContact={add} /></View><View style={{ width: wide ? 250 : undefined, gap: 20 }}><View style={styles.greenCard}><Text style={{ color: c.accentSoft, fontSize: 12, letterSpacing: 2 }}>持續經營的關係</Text><Text style={{ color: 'white', fontSize: 44, fontWeight: '600', marginTop: 20 }}>{workspace.contacts.length}</Text><Text style={{ color: c.accentSoft, marginBottom: 22 }}>位聯絡人</Text><Button secondary onPress={() => setTab('contacts')}>查看我的聯絡人 →</Button></View><Card><Text style={s.title}>聯絡的節奏</Text>{workspace.grades.map(g => <Text key={g.code} style={s.muted}>{g.code} 級　每 {gradeLabel(g)}</Text>)}<Button secondary onPress={() => setTab('settings')}>管理自訂等級</Button></Card></View></View>}
         {tab === 'calendar' && workspace.events.some(e => e.date === null) && <Card><Text style={s.title}>未定日期行程（含已完成）</Text>{workspace.events.filter(e => e.date === null).map(e => <Button key={e.id} secondary onPress={() => setEventEditor(e)}>{e.title}{e.completed ? '（已完成）' : '（未定日期）'}</Button>)}</Card>}
         {tab === 'contacts' && <ContactsScreen events={workspace.events} onOpenEvent={setEventEditor} initialContactId={selectedContactId} session={session} saving={workspace.saving} onSave={workspace.saveContact} contacts={workspace.contacts} grades={workspace.grades} onAdd={add} onEdit={contact => setEditor({ contact })} />}
@@ -108,5 +113,5 @@ function WorkspaceApp({ session, onExpired }: { session: Session; onExpired: () 
   </View>{editor && <ContactEditor session={session} onAddGrade={workspace.addGrade} contact={editor.contact} grades={workspace.grades} saving={workspace.saving} onSave={workspace.saveContact} onClose={() => setEditor(null)} />}{eventEditor && <EventEditor session={session} grades={workspace.grades} onComplete={workspace.completeEvent} onOpenContact={id=>{setEventEditor(null);openContact(id);}} contacts={workspace.contacts} event={eventEditor} existing={workspace.events.some(e => e.id === eventEditor.id)} saving={workspace.saving} onSave={workspace.saveEvent} onDelete={workspace.deleteEvent} onClose={() => setEventEditor(null)} />}</SafeAreaView>;
 }
 const makeStyles = (c: Palette) => StyleSheet.create({
-  root: { flex: 1, backgroundColor: c.background }, bottomBar: { backgroundColor: c.paper, borderTopWidth: 1, borderColor: c.line, paddingHorizontal: 8, paddingVertical: 8 }, bottomTabs: { flexDirection: 'row', width: '100%', maxWidth: 800, alignSelf: 'center', gap: 4 }, nav: { flex: 1, minWidth: 0, minHeight: 60, gap: 4, paddingVertical: 8, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }, heading: { fontSize: 32, fontWeight: '700', color: c.ink, letterSpacing: 1 }, eyebrow: { color: c.gold, letterSpacing: 3, fontSize: 11, fontWeight: '600' }, notice: { backgroundColor: c.pale, padding: 12, borderRadius: 10 }, greenCard: { backgroundColor: c.green, borderWidth: 0, borderColor: c.gold, borderRadius: 22, padding: 24 },
+  root: { flex: 1, backgroundColor: c.background }, bottomBar: { backgroundColor: c.paper, borderTopWidth: 1, borderColor: c.line, paddingHorizontal: 8, paddingVertical: 8 }, bottomTabs: { flexDirection: 'row', width: '100%', maxWidth: 800, alignSelf: 'center', gap: 4 }, nav: { flex: 1, minWidth: 0, minHeight: 60, gap: 4, paddingVertical: 8, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }, heading: { fontSize: 32, fontWeight: '700', color: c.ink, letterSpacing: 1 }, eyebrow: { color: c.gold, letterSpacing: 3, fontSize: 11, fontWeight: '600' }, notice: { backgroundColor: c.pale, padding: 12, borderRadius: 10 }, greenCard: { backgroundColor: c.green, borderWidth: 1, borderColor: c.gold, borderRadius: c.radius, padding: 24 },
 });

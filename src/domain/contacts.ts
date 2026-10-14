@@ -43,7 +43,7 @@ export function validateContact(draft: ContactDraft): string | null {
       if (record.reviewGrade !== undefined && (typeof record.reviewGrade !== 'string' || record.reviewGrade.length > 100)) return '重新分級資料無效。';
       if (record.scoreCode !== undefined && (typeof record.scoreCode !== 'string' || record.scoreCode.length > 100)) return '計分項目無效。';
       if (typeof record.date !== 'string' || !isDate(record.date)) return '紀錄日期請使用有效的 YYYY-MM-DD 日期。';
-      if (typeof record.content !== 'string' || !record.content.trim() || record.content.length > 5000) return '紀錄內容請填寫 1–5000 個字元。';
+      if (typeof record.content !== 'string') return '紀錄內容格式錯誤。';
     }
   }
   if (!draft.name.trim()) return '請輸入姓名。';

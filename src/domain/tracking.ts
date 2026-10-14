@@ -12,12 +12,12 @@ export function changeTracking(contact: Contact, grades: readonly Grade[], input
   if (contact.archived) throw new Error('請先恢復已封存的聯絡人。');
   if (!isDate(input.date) || (input.next !== null && !isDate(input.next))) throw new Error('請輸入有效日期。');
   if ((contact.trackingHistory ?? []).some(h => h.id === input.id)) return contact;
-  if (input.kind === 'complete' && (!input.content?.trim() || (input.next && input.next <= input.date))) throw new Error('請填寫聯絡內容，下次日期須晚於完成日期。');
+  if (input.kind === 'complete' && (input.next && input.next <= input.date)) throw new Error('下次日期須晚於完成日期。');
   if (input.gradeCode && !grades.some(g => g.code === input.gradeCode)) throw new Error('請選擇有效分級。');
   if (input.kind === 'reschedule' && needsGradeReview(contact)) throw new Error('請先完成本次聯絡的重新分級。');
   const from = nextContactDate(contact, grades);
   return { ...contact, grade: input.gradeCode || contact.grade, nextContactDate: input.kind === 'complete' && !input.gradeCode ? null : input.next, followupCompleted: false,
-    records: input.kind === 'complete' ? [...(contact.records ?? []), { id: input.id, date: input.date, content: input.content!.trim(), scoreCode: input.scoreCode ?? '', reviewGrade: input.gradeCode ?? '' }] : contact.records,
+    records: input.kind === 'complete' ? [...(contact.records ?? []), { id: input.id, date: input.date, content: input.content ?? '', scoreCode: input.scoreCode ?? '', reviewGrade: input.gradeCode ?? '' }] : contact.records,
     trackingHistory: [...(contact.trackingHistory ?? []), { id: input.id, kind: input.kind, from, previousGrade: contact.grade, to: input.kind === 'complete' && !input.gradeCode ? null : input.next, at: input.date, ...(input.kind === 'complete' ? { recordId: input.id } : {}) }],
   };
 }
@@ -37,6 +37,9 @@ export function reviewContactGrade<T extends Pick<Contact, 'records' | 'grade' |
   const grade = grades.find(g => g.code === code);
   if (!grade) throw new Error('請選擇有效分級。');
   const pending = (contact.records ?? []).filter(r => r.reviewGrade === '');
-  const lastDate = pending.map(r => r.date).sort().at(-1) ?? (!contact.grade && contact.createdAt ? creationDate(contact.createdAt) : null);
+  const lastDate = gradeBaseDate(contact);
   return {...contact, grade: code, records: contact.records?.map(r => r.reviewGrade === '' ? {...r, reviewGrade: code} : r), ...(lastDate ? {nextContactDate: addInterval(lastDate, grade)} : {})};
+}
+export function gradeBaseDate(contact: {records?: Contact['records'];createdAt?:string}): string {
+  return contact.records?.map(r=>r.date).sort().at(-1) ?? (contact.createdAt ? creationDate(contact.createdAt) : null) ?? creationDate(new Date().toISOString())!;
 }

@@ -9,7 +9,10 @@ test('contact records survive workspace roundtrip and reject invalid input', () 
   const workspace = { ...emptyWorkspace(), contacts: [{ ...contact, records: [record] }] };
   assert.deepEqual(parseWorkspace(JSON.parse(JSON.stringify(workspace))).contacts[0].records, [record]);
   assert.doesNotThrow(() => parseWorkspace({ ...emptyWorkspace(), contacts: [contact] }));
-  for (const records of [[{ ...record, content: ' ' }], [{ ...record, date: '2026-02-30' }], [record, record], 'bad', [null]]) {
+  for (const content of ['', ' ', '長'.repeat(20000)]) {
+    assert.equal(parseWorkspace({...workspace,contacts:[{...contact,records:[{...record,content}]}]}).contacts[0].records![0].content,content);
+  }
+  for (const records of [[{ ...record, date: '2026-02-30' }], [record, record], 'bad', [null]]) {
     assert.throws(() => parseWorkspace({ ...workspace, contacts: [{ ...contact, records }] }));
   }
 });

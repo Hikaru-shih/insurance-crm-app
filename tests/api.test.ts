@@ -68,7 +68,7 @@ test('authenticated API isolation, grants, admin and durable data', async t => {
       const result = await request(own, at, 'PUT', adjusted);
       assert.equal(result.status, 200); saved = result.data;
       assert.equal(saved.grades[0].amount, 99);
-      assert.equal((await request('/api/scores', at)).data.filter((row: {id:string}) => row.id === 'contact-created:contact-a').length, 1);
+      assert.equal((await request('/api/scores', at)).data.filter((row: {id:string}) => row.id === 'contact-created:contact-a').length, 0);
       const invalid = structuredClone(saved); invalid.grades[0].amount = 0;
       assert.equal((await request(own, at, 'PUT', invalid)).status, 400);
       const blank = structuredClone(saved); blank.contacts[0].name = '  ';

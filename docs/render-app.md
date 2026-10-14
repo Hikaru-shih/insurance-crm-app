@@ -97,3 +97,9 @@ App 建置時設定 `EXPO_PUBLIC_API_URL=https://你的API網址`；手機只呼
 PostgreSQL 使用平台備份或 pg_dump／pg_restore，必須先還原至另一個空資料庫並驗證帳號與資料。正式雲端備份還原尚未演練。現有 db:backup／db:restore 只支援本機 SQLite，偵測到 DATABASE_URL 時會拒絕操作。不要把 SQLite 測試備份匯入正式庫。
 
 舊 Docker Compose／Caddy 範本保留作參考，不是本次 App 部署路徑。
+
+## 2026-10-14 藍金品牌外觀
+
+- 預設主題「錢脈藍金」：米白卡片、深藍主色與暖金點綴。既有手動選擇的外觀保留；可從外觀風格選擇新主題。
+- 登入與資料讀取畫面使用 Logo/Logo.png；原生啟動畫面使用深藍背景與置中的 Logo。
+- 啟動畫面需重新 EAS 打包並安裝，Render 部署或 Expo Go 不能代表正式啟動畫面的效果。Android / iOS 均需實機確認。

@@ -1,5 +1,6 @@
+import { ContactInterval } from '../../ui/ContactInterval';
 import {DateRangePicker,useDateRange} from '../../ui/DateRangePicker';
-import { reviewContactGrade, needsGradeReview } from '../../domain/tracking';
+import { reviewContactGrade, needsGradeReview, gradeBaseDate } from '../../domain/tracking';
 import { api, Session } from '../../data/api';
 import * as Crypto from 'expo-crypto';
 import { useEffect, useState } from 'react';
@@ -38,7 +39,7 @@ export function ContactEditor({ session, contact, grades, saving, onSave, onClos
       setGradeError('');
       const grade = createGrade(gradeName, Number(gradeAmount), gradeUnit, grades);
       await onAddGrade(grade.code, grade.amount, grade.unit);
-      setDraft(d => reviewContactGrade(d, grade.code, [...grades, grade])); setSaved(false);
+      setDraft(d => reviewContactGrade({...d,createdAt}, grade.code, [...grades, grade])); setSaved(false);
       setAddingGrade(false); setGradeName(''); setGradeAmount('');
     } catch (e) { setGradeError(e instanceof Error ? e.message : '新增等級失敗，請重試。'); }
   };
@@ -65,8 +66,9 @@ export function ContactEditor({ session, contact, grades, saving, onSave, onClos
         </ScrollView>
         {section === 'grades' && <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24, gap: 18 }}>
           <Text style={s.label}>客戶等級</Text>{needsGradeReview(draft) && <Text style={s.error}>本次聯絡尚未重新分級；請選一次等級（可沿用原等級），儲存後才安排下次聯絡。</Text>}
-          <View style={s.row}>{[{ code: '', text: '未分級' }, ...grades.map(g => ({ code: g.code, text: `${g.code} · ${gradeLabel(g)}` }))].map(g => <Pressable key={g.code} accessibilityRole="button" accessibilityState={{ selected: draft.grade === g.code }} onPress={() => { if (g.code) { setDraft(d => reviewContactGrade(d, g.code, grades)); setSaved(false); } else set('grade', ''); }} style={[styles.chip, draft.grade === g.code && { backgroundColor: c.green }]}><Text style={{ color: draft.grade === g.code ? 'white' : c.green }}>{g.text}</Text></Pressable>)}</View>
+          <View style={s.row}>{[{ code: '', text: '未分級' }, ...grades.map(g => ({ code: g.code, text: `${g.code} · ${gradeLabel(g)}` }))].map(g => <Pressable key={g.code} accessibilityRole="button" accessibilityState={{ selected: draft.grade === g.code }} onPress={() => { if (g.code) { setDraft(d => reviewContactGrade({...d,createdAt}, g.code, grades)); setSaved(false); } else set('grade', ''); }} style={[styles.chip, draft.grade === g.code && { backgroundColor: c.green }]}><Text style={{ color: draft.grade === g.code ? 'white' : c.green }}>{g.text}</Text></Pressable>)}</View>
 
+          {draft.grade && <ContactInterval base={gradeBaseDate({...draft,createdAt})} next={draft.nextContactDate ?? reviewContactGrade({...draft,createdAt},draft.grade,grades).nextContactDate ?? ''} onChange={value=>set('nextContactDate',value)}/>}
           <Button secondary disabled={saving} onPress={() => setAddingGrade(value => !value)}>{addingGrade ? '收起新增等級' : '＋ 新增等級'}</Button>
           {addingGrade && <View style={{ padding: 16, gap: 16, backgroundColor: c.background, borderRadius: 12 }}>
             <Field label="等級名稱" value={gradeName} onChange={setGradeName} placeholder="例如 D、AA、VIP、重點客戶" />
@@ -81,7 +83,7 @@ export function ContactEditor({ session, contact, grades, saving, onSave, onClos
         {section === 'records' && <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24, gap: 18 }}>
           <Text style={s.title}>{draft.name || '此聯絡人'}的聯絡紀錄</Text><DateRangePicker value={recordRange} label="紀錄時段" />
           <Button secondary disabled={saving} onPress={() => { const id = Crypto.randomUUID(); set('records', [{ id, date: creationDate(new Date().toISOString())!, content: '', reviewGrade: '' }, ...(draft.records ?? [])]); setEditingRecord(id); }}>＋ 新增紀錄</Button>
-          <Text style={s.muted}>新增、編輯或刪除紀錄後，按上方「儲存」才會保存。</Text>
+          <Button secondary disabled={saving} onPress={() => { const id = Crypto.randomUUID(); set('records', [{ id, date: creationDate(new Date().toISOString())!, content: '', scoreCode: 'contact', reviewGrade: '' }, ...(draft.records ?? [])]); setEditingRecord(id); }}>＋ 新增聯繫 · 1 分</Button><Text style={s.muted}>內容可留白。新增聯絡人不計分；新增聯繫並儲存後才計分。</Text><Text style={s.muted}>新增、編輯或刪除紀錄後，按上方「儲存」才會保存。</Text>
           {(draft.records ?? []).filter(record=>recordRange.contains(record.date)||editingRecord===record.id).map(record => <View key={record.id} style={{ padding: 16, gap: 12, borderRadius: 12, backgroundColor: c.background }}>
             {editingRecord === record.id ? <><Field label="紀錄日期（YYYY-MM-DD）" value={record.date} onChange={date => set('records', draft.records!.map(item => item.id === record.id ? { ...item, date } : item))} />
             <Text style={s.label}>計分項目</Text><View style={s.row}>{[{code: '', label: '不計分', points: 0}, ...scoreRules].map(rule => <Button key={rule.code} secondary={(record.scoreCode ?? '') !== rule.code} disabled={saving} onPress={() => set('records', draft.records!.map(item => item.id === record.id ? {...item, scoreCode: rule.code} : item))}>{rule.label}{rule.code ? ` · ${rule.points} 分` : ''}</Button>)}</View>

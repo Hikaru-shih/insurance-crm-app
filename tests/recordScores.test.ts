@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDatabase } from '../server/database';
-import { syncRecordScores, syncContactCreationScores } from '../server/recordScores';
+import { syncRecordScores } from '../server/recordScores';
 import { emptyWorkspace } from '../src/domain/workspace';
 import { emptyContact } from '../src/domain/contacts';
 test('saved contact records count once, retain snapshots, move dates and revoke on deletion', async () => {
@@ -26,23 +26,23 @@ test('saved contact records count once, retain snapshots, move dates and revoke 
   } finally {db.close();}
 });
 
-test('new contacts earn exactly one point across retries, edits and reinsertion', async () => {
+test('new contacts never score without an explicit record', async () => {
   const db = openDatabase(':memory:');
   try {
     db.prepare('INSERT INTO users(id,email,password_hash,role,active,created_at) VALUES(?,?,?,?,?,?)').run('u','test@example.com','hash','user',1,'2026-09-27');
     const empty = emptyWorkspace();
     const next = {...empty, contacts:[{...emptyContact(),id:'c',name:'測試',createdAt:'2026-09-27',updatedAt:'2026-09-27'}]};
     db.exec("UPDATE kpi_rules SET points=99 WHERE code='contact'");
-    await syncContactCreationScores(db,'u',empty,next);
-    await syncContactCreationScores(db,'u',empty,next);
-    await syncContactCreationScores(db,'u',next,next);
-    await syncContactCreationScores(db,'u',next,empty);
-    await syncContactCreationScores(db,'u',empty,next);
+    await syncRecordScores(db,'u',empty,next);
+    await syncRecordScores(db,'u',empty,next);
+    await syncRecordScores(db,'u',next,next);
+    await syncRecordScores(db,'u',next,empty);
+    await syncRecordScores(db,'u',empty,next);
     const row = db.prepare('SELECT COUNT(*) AS n,SUM(points) AS points FROM score_entries').get()!;
-    assert.equal(row.n,1); assert.equal(row.points,1);
+    assert.equal(row.n,0); assert.equal(row.points,null);
     db.exec('BEGIN');
-    await syncContactCreationScores(db,'u',next,{...next,contacts:[...next.contacts,{...next.contacts[0],id:'failed'}]});
+    await syncRecordScores(db,'u',next,{...next,contacts:[...next.contacts,{...next.contacts[0],id:'failed'}]});
     db.exec('ROLLBACK');
-    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM score_entries').get()!.n,1);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM score_entries').get()!.n,0);
   } finally {db.close();}
 });
