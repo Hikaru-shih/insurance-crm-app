@@ -1,3 +1,4 @@
+import { removeContact } from '../domain/deleteContact';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Crypto from 'expo-crypto';
 import { ScheduleEvent, saveEvent as updateEvents } from '../domain/events';
@@ -40,6 +41,7 @@ export function useWorkspace(repository: WorkspaceRepository = localRepository) 
     });
     return current.current.contacts.find(contact => contact.id === contactId)!;
   };
+  const deleteContact = async (id: string) => { await commit(state => removeContact(state,id)); };
   const addGrade = async (code: string, amount: number, unit: IntervalUnit) => {
     await commit(state => ({ ...state, grades: [...state.grades, createGrade(code, amount, unit, state.grades)] }));
   };
@@ -68,5 +70,5 @@ export function useWorkspace(repository: WorkspaceRepository = localRepository) 
   const saveEvent = async (event: ScheduleEvent) => { await commit(state => ({ ...state, events: updateEvents(state.events, event) })); return current.current.events.find(e => e.id === event.id)!; };
   const deleteEvent = async (id: string) => { await commit(state => ({ ...state, events: state.events.filter(e => e.id !== id) })); };
   const completeEvent=async(event:ScheduleEvent,input:EventCompletion)=>{await commit(state=>completeSchedule(state,event,input));return current.current.events.find(e=>e.id===event.id)!;};
-  return { ...data, loading, loadError, saving, reload, saveContact, addGrade, updateGrade, deleteGrade, importLegacy, saveEvent, deleteEvent, completeEvent };
+  return { ...data, loading, loadError, saving, reload, saveContact, deleteContact, addGrade, updateGrade, deleteGrade, importLegacy, saveEvent, deleteEvent, completeEvent };
 }

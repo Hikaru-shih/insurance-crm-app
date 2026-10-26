@@ -13,7 +13,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.hikarucom.qianmai",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -30,7 +30,15 @@
     },
     "owner": "hikarucom",
     "plugins": [
-      ["expo-splash-screen", {"image":"./Logo/Logo.png","imageWidth":180,"resizeMode":"contain","backgroundColor":"#172F4D"}]
+      [
+        "expo-splash-screen",
+        {
+          "image": "./Logo/Logo.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#172F4D"
+        }
+      ]
     ]
   }
 }
