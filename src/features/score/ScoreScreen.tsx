@@ -1,13 +1,13 @@
 import {DateRangePicker,useDateRange} from '../../ui/DateRangePicker';
 import {rangeLabel} from '../../domain/dateRange';
 import { PersonalRank } from './PersonalRank';
-import { reportRange, ReportPeriod } from '../../domain/reporting';
+import { ScoreTable } from './ScoreTable';
 import { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { api, Session } from '../../data/api';
 import { creationDate } from '../../domain/followups';
 import { Button, Card, Field, useStyles } from '../../ui/components';
-import { useColors, Palette } from '../../ui/theme';
+import { useColors } from '../../ui/theme';
 type Rule = { code: string; label: string; points: number };
 type Entry = Rule & { id: string; date: string; note: string; revoked: number };
 export function ScoreScreen({ session, ownerId }: { session: Session; ownerId?: string }) {
@@ -34,11 +34,16 @@ export function ScoreScreen({ session, ownerId }: { session: Session; ownerId?: 
   const range = selection.range;
   const reportEntries = entries.filter(e => range && !e.revoked && e.date >= range.start && e.date <= range.end);
   const reportTotal = reportEntries.reduce((sum,e) => sum + e.points,0);
-  return <View style={{ gap: 20 }}><Card><DateRangePicker value={selection} label="計分時段" /></Card>{!ownerId && <PersonalRank session={session} params={selection.params} revision={rankRevision} />}
+  return <View style={{ gap: 20 }}><Card><DateRangePicker value={selection} label="計分時段" /></Card>
+    <Card><Text style={s.title}>每日項目計分表</Text>
+      {range ? <ScoreTable key={`${range.start}:${range.end}`} rules={rules} entries={entries} range={selection.period === 'all' ? {start: entries.filter(e => !e.revoked).map(e => e.date).sort()[0] ?? date, end: entries.filter(e => !e.revoked).map(e => e.date).sort().at(-1) ?? date} : range} ready={ready} selectedDate={date} onSelectDate={setDate} /> : <Text style={s.error}>請選擇有效的計分時段。</Text>}
+      <Button secondary disabled={busy} onPress={() => void run(load)}>{busy ? '更新中…' : '更新計分資料'}</Button>
+    </Card>
+    {!ownerId && <PersonalRank session={session} params={selection.params} revision={rankRevision} />}
     <Card><Text style={s.title}>每日計分卡</Text><Field label="計分日期（YYYY-MM-DD）" value={date} onChange={setDate} />
       <Text style={s.label}>當日得分</Text><Text style={{fontSize: 38, fontWeight: '700', color: c.green}}>{ready ? total : '—'} 分</Text>
       <Text style={s.label}>累計總分（所有日期）</Text><Text style={{fontSize: 28, fontWeight: '700', color: c.green}}>{ready ? cumulative : '—'} 分</Text>
-      <Text style={s.muted}>每次聯繫都算數，分數持續累積，沒有上限。</Text><Button secondary disabled={busy} onPress={() => void run(load)}>更新計分資料</Button>    </Card>
+      <Text style={s.muted}>每次聯繫都算數，分數持續累積，沒有上限。</Text></Card>
     <Card><Text style={s.title}>{rangeLabel(selection.period)}</Text><Text style={s.muted}>依選定區間的紀錄日期統計，不影響後台結算設定。</Text>{range ? <><Text style={s.label}>{selection.period==='all'?'所有日期':`${range.start} ～ ${range.end}`}</Text><Text style={s.title}>{ready ? reportTotal : '—'} 分</Text><Text style={s.muted}>{reportEntries.length} 筆有效行動</Text>{rules.map(rule => <Text key={rule.code} style={s.muted}>{rule.label}：{reportEntries.filter(e => e.code === rule.code).length} 筆 · {reportEntries.filter(e => e.code === rule.code).reduce((sum,e) => sum+e.points,0)} 分</Text>)}{reportEntries.map(entry => <Text key={entry.id} style={s.muted}>{entry.date} · {entry.label} · {entry.points} 分 · {entry.note}</Text>)}</> : <Text style={s.error}>請輸入有效日期以查看報表。</Text>}</Card>
     <Text style={s.muted}>計分卡僅供查看。請在聯絡紀錄選擇計分項目並儲存；修改或刪除該紀錄會同步更新分數。</Text>
     {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}

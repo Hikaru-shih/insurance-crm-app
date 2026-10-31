@@ -1,4 +1,4 @@
-import { Contact, DEFAULT_GRADES, createGrade, validateContact } from './contacts';
+import { birthdayMonthDay, Contact, DEFAULT_GRADES, createGrade, validateContact } from './contacts';
 import type { Grade } from './contacts';
 import { parseEvents, ScheduleEvent } from './events';
 export type Workspace = { version: 2; revision: number; contacts: Contact[]; grades: Grade[]; events: ScheduleEvent[] };
@@ -34,7 +34,7 @@ export function parseWorkspace(value: unknown): Workspace {
     const dateIds = new Set<string>();
     const contact: Contact = {
       id: text('id'), name: text('name'), nickname: text('nickname', ''), phone: text('phone', ''), email: text('email', ''),
-      gender: text('gender', ''), instagram: text('instagram', ''), birthday: text('birthday', ''),
+      gender: text('gender', ''), instagram: text('instagram', ''), birthday: birthdayMonthDay(text('birthday', '')),
       groups: [...new Set<string>((item.groups ?? []).map((g: unknown) => { if (typeof g !== 'string' || !g.trim() || g.length > 80) throw new Error('群組格式錯誤'); return g.trim(); }))],
       grade: text('grade'), notes: text('notes'), createdAt: text('createdAt'), updatedAt: text('updatedAt'),
       ...(item.archived !== undefined ? { archived: item.archived } : {}),

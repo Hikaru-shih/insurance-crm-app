@@ -18,7 +18,7 @@ export async function syncRecordScores(db: ScoreDatabase, owner: string, before:
         } | undefined;
         if (!rule)
             throw new Error('計分項目不存在，請重新讀取計分規則');
-        if (record.scoreCode === 'contact') rule.points = 1;
+        if (record.scoreCode === 'contact' || record.scoreCode === 'new_contact') rule.points = 1;
         const existing = (await db.prepare('SELECT code FROM score_entries WHERE owner_id=? AND id=?').get(owner, id));
         if (!existing) {
             (await db.prepare('INSERT INTO score_entries(owner_id,id,date,code,label,points,note) VALUES(?,?,?,?,?,?,?)').run(owner, id, record.date, record.scoreCode, rule.label, rule.points, record.content));

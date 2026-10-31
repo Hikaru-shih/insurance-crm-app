@@ -17,7 +17,7 @@ test('live WAL backup restores account data and clears authentication without re
     db.prepare("INSERT INTO score_entries(owner_id,id,date,code,label,points,note) VALUES('u','score','2026-10-05','contact','聯繫',1,'備份積分')").run();
     const result=await createBackup(source,file);assert.equal(result.counts.users,1);assert.equal(result.counts.score_entries,1);
     db.prepare("UPDATE users SET name='備份後變更' WHERE id='u'").run();
-    assert.equal(verifyBackup(file).version,6);restoreBackup(file,target);
+    assert.equal(verifyBackup(file).version,7);restoreBackup(file,target);
     const restored=openDatabase(target);
     try {assert.equal(restored.prepare('SELECT name FROM users').get()!.name,'備份測試');assert.equal(restored.prepare('SELECT count(*) n FROM sessions').get()!.n,0);assert.equal(restored.prepare('SELECT count(*) n FROM account_tokens').get()!.n,0);assert.equal(restored.prepare('SELECT note FROM score_entries').get()!.note,'備份積分');}finally{restored.close();}
     assert.throws(()=>restoreBackup(file,source),/全新路徑/);

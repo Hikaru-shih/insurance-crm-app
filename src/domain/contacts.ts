@@ -47,13 +47,16 @@ export function validateContact(draft: ContactDraft): string | null {
     }
   }
   if (!draft.name.trim()) return '請輸入姓名。';
-  if (draft.birthday && !isDate(draft.birthday)) return '生日請使用有效的 YYYY-MM-DD 日期。';
-  if (draft.birthday && draft.birthday > new Date().toISOString().slice(0, 10)) return '生日不能是未來日期。';
+  if (draft.birthday && !isDate('2000-' + birthdayMonthDay(draft.birthday))) return '生日請填寫有效的月日，例如 05-20。';
   for (const date of draft.importantDates) {
     if (!date.label.trim()) return '請填寫每筆重要日期的名稱，或移除不需要的項目。';
     if (!isDate(date.date)) return '重要日期請使用有效的 YYYY-MM-DD 日期。';
   }
   return null;
+}
+// Accept legacy full dates, while presenting and saving only month/day.
+export function birthdayMonthDay(value: string): string {
+  return isDate(value) ? value.slice(5) : value;
 }
 export function isDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;

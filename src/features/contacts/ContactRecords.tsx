@@ -29,7 +29,7 @@ export function ContactRecords({ events = [], onOpenEvent, contact, saving, onSa
       setDeleting(null);
     } catch (e) { setError(e instanceof Error ? e.message : '刪除失敗，請重試。'); }
   };
-  return <Card><Text style={s.title}>聯絡紀錄</Text><DateRangePicker value={selection} label="紀錄時段" /><Button secondary disabled={saving} onPress={()=>{setError('');setEditing({id:Crypto.randomUUID(),date:creationDate(new Date().toISOString())!,content:'',scoreCode:'contact',reviewGrade:''});}}>＋ 新增聯繫 · 1 分</Button><Text style={s.muted}>內容可留白，按「儲存紀錄」後計分。</Text>
+  return <Card><Text style={s.title}>聯絡紀錄</Text><DateRangePicker value={selection} label="紀錄時段" /><Button secondary disabled={saving} onPress={()=>{setError('');setEditing({id:Crypto.randomUUID(),date:creationDate(new Date().toISOString())!,content:'',scoreCode: 'new_contact',reviewGrade:''});}}>＋ 新增聯絡人計分 · 1 分</Button><Text style={s.muted}>內容可留白，按「儲存紀錄」後計分。</Text>
     {(contact.records ?? []).filter(record=>selection.contains(record.date)).map(record => <View key={record.id} style={{ gap: 12, paddingVertical: 12 }}>
       <Text style={s.label}>{record.date}</Text><Text selectable style={s.muted}>{record.content}</Text>
       {onOpenEvent&&events.filter(e=>e.contactId===contact.id&&e.recordId===record.id).map(e=><Button key={e.id} secondary onPress={()=>onOpenEvent(e)}>查看來源行程：{e.title}</Button>)}

@@ -115,7 +115,7 @@ test('authenticated API isolation, grants, admin and durable data', async t => {
       assert.equal(ownedEvent.status, 200); saved = ownedEvent.data;
       assert.equal((await request(own, mt)).data.events[0].title, '帳號行程');
       const audit = await request('/api/admin/audit', mt); assert.ok(audit.data.some((r: { action: string }) => r.action === 'admin.workspace.updated'));
-      assert.equal((await request('/api/kpi-rules', at)).data.length, 6);
+      assert.equal((await request('/api/kpi-rules', at)).data.length, 7);
     });
     await t.test('logout revokes token, expiration and inactive accounts cannot access', async () => {
       assert.equal((await request('/api/auth/logout', bt, 'POST')).status, 200);

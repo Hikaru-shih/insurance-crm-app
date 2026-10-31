@@ -20,7 +20,7 @@ export async function migratePostgres(db:AsyncDatabase){
  await db.transaction(async()=>{
   await db.prepare('CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)').run();
   const current=await db.prepare('SELECT MAX(version) AS version FROM schema_migrations').get();
-  const version=Number(current?.version??0);if(version>2)throw new Error('PostgreSQL schema is newer than this server');
+  const version=Number(current?.version??0);if(version>3)throw new Error('PostgreSQL schema is newer than this server');
   if(version===0){const sql=readFileSync(new URL('./migrations/postgres/001.sql',import.meta.url),'utf8');
    // Schema SQL contains no procedural blocks; individual statements work with both pg and the embedded PostgreSQL test engine.
    for(const statement of sql.split(';').map(s=>s.trim()).filter(Boolean))await db.prepare(statement).run();
@@ -29,6 +29,11 @@ export async function migratePostgres(db:AsyncDatabase){
   if(version<2){
    await db.prepare(readFileSync(new URL('./migrations/postgres/002.sql',import.meta.url),'utf8')).run();
    await db.prepare('INSERT INTO schema_migrations VALUES(?,?)').run(2,new Date().toISOString());
+  }
+  if(version<3){
+   const sql=readFileSync(new URL('./migrations/postgres/003.sql',import.meta.url),'utf8');
+   for(const statement of sql.split(';').map(s=>s.trim()).filter(Boolean))await db.prepare(statement).run();
+   await db.prepare('INSERT INTO schema_migrations VALUES(?,?)').run(3,new Date().toISOString());
   }
  });
 }

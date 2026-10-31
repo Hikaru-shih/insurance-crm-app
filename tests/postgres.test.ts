@@ -35,7 +35,7 @@ test('PostgreSQL schema, API isolation, atomic scores, leaderboard and recovery'
   await migratePostgres(db);
   await migratePostgres(db);
   assert.equal((await db.prepare('SELECT count(*) n FROM users').get())!.n, 0);
-  assert.equal((await db.prepare('SELECT count(*) n FROM kpi_rules').get())!.n, 6);
+  assert.equal((await db.prepare('SELECT count(*) n FROM kpi_rules').get())!.n, 7);
   const app = createApi({ database: '', connection: db, allowRegistration: true, recoveryCodesOnly: true, mailer: async mail => { mails.push(mail); } });
   app.server.listen(0, '127.0.0.1'); await once(app.server, 'listening');
   const base = `http://127.0.0.1:${(app.server.address() as { port: number }).port}`;

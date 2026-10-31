@@ -1,3 +1,4 @@
+import { BirthdayPicker } from '../../ui/BirthdayPicker';
 import { ContactInterval } from '../../ui/ContactInterval';
 import {DateRangePicker,useDateRange} from '../../ui/DateRangePicker';
 import { reviewContactGrade, needsGradeReview, gradeBaseDate } from '../../domain/tracking';
@@ -5,7 +6,7 @@ import { api, Session } from '../../data/api';
 import * as Crypto from 'expo-crypto';
 import { useEffect, useState } from 'react';
 import { BackHandler, Modal, Pressable, ScrollView, StyleSheet, Text, View, KeyboardAvoidingView, Platform } from 'react-native';
-import { Contact, ContactDraft, Grade, IntervalUnit, createGrade, emptyContact, gradeLabel } from '../../domain/contacts';
+import { birthdayMonthDay, Contact, ContactDraft, Grade, IntervalUnit, createGrade, emptyContact, gradeLabel } from '../../domain/contacts';
 import { creationDate } from '../../domain/followups';
 import { Button, Field, useStyles } from '../../ui/components';
 import { useColors, Palette } from '../../ui/theme';
@@ -15,10 +16,11 @@ export function ContactEditor({ session, contact, grades, saving, onSave, onClos
   const recordRange=useDateRange();
   const c = useColors();
   const styles = makeStyles(c);
-  const [draft, setDraft] = useState<ContactDraft>(contact ? { ...contact, importantDates: contact.importantDates.map(d => ({ ...d })) } : emptyContact());
+  const [draft, setDraft] = useState<ContactDraft>(contact ? { ...contact, birthday: birthdayMonthDay(contact.birthday), importantDates: contact.importantDates.map(d => ({ ...d })) } : emptyContact());
   const [scoreRules, setScoreRules] = useState<{code: string; label: string; points: number}[]>([]);
   useEffect(() => { api<typeof scoreRules>('/api/kpi-rules', session.token).then(setScoreRules).catch(() => setError('無法讀取計分項目，請重新開啟編輯頁。')); }, [session.token]);
   const [section, setSection] = useState<'grades' | 'home' | 'records'>('home');
+  const [genderPicker, setGenderPicker] = useState(false);
   const [addingGrade, setAddingGrade] = useState(false);
   const [gradeName, setGradeName] = useState('');
   const [gradeAmount, setGradeAmount] = useState('');
@@ -58,10 +60,9 @@ export function ContactEditor({ session, contact, grades, saving, onSave, onClos
         </View>
         <ScrollView style={{ flex: 1, display: section === 'home' ? 'flex' : 'none' }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24, gap: 18 }}>
           <Field label="姓名（必填）" value={draft.name} onChange={v => set('name', v)} placeholder="如何稱呼這位客戶？" />
-          <Field label="性別" value={draft.gender} onChange={v => set('gender', v)} placeholder="選填" />
+          <View style={{gap:8}}><Text style={s.label}>性別</Text><Button secondary onPress={() => setGenderPicker(true)}>{draft.gender || '請選擇（選填）'} ▾</Button></View>
           <Field label="IG" value={draft.instagram} onChange={v => set('instagram', v)} placeholder="IG 帳號或個人頁連結（選填）" />
-          <Field label="群組" value={draft.groups.join('、')} onChange={v => set('groups', v.split(/[、,，]/))} placeholder="例如：朋友、同事（選填）" />
-          <Field label="生日（YYYY-MM-DD）" value={draft.birthday} onChange={v => set('birthday', v)} placeholder="例如 1995-05-20（選填）" />
+          <BirthdayPicker value={draft.birthday} onSelect={v => set('birthday', v)} />
           <Field label="備註" value={draft.notes} onChange={v => set('notes', v)} placeholder="記下一點關於這位客戶的事…" multiline />
         </ScrollView>
         {section === 'grades' && <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24, gap: 18 }}>
@@ -83,7 +84,7 @@ export function ContactEditor({ session, contact, grades, saving, onSave, onClos
         {section === 'records' && <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24, gap: 18 }}>
           <Text style={s.title}>{draft.name || '此聯絡人'}的聯絡紀錄</Text><DateRangePicker value={recordRange} label="紀錄時段" />
           <Button secondary disabled={saving} onPress={() => { const id = Crypto.randomUUID(); set('records', [{ id, date: creationDate(new Date().toISOString())!, content: '', reviewGrade: '' }, ...(draft.records ?? [])]); setEditingRecord(id); }}>＋ 新增紀錄</Button>
-          <Button secondary disabled={saving} onPress={() => { const id = Crypto.randomUUID(); set('records', [{ id, date: creationDate(new Date().toISOString())!, content: '', scoreCode: 'contact', reviewGrade: '' }, ...(draft.records ?? [])]); setEditingRecord(id); }}>＋ 新增聯繫 · 1 分</Button><Text style={s.muted}>內容可留白。新增聯絡人不計分；新增聯繫並儲存後才計分。</Text><Text style={s.muted}>新增、編輯或刪除紀錄後，按上方「儲存」才會保存。</Text>
+          <Button secondary disabled={saving} onPress={() => { const id = Crypto.randomUUID(); set('records', [{ id, date: creationDate(new Date().toISOString())!, content: '', scoreCode: 'new_contact', reviewGrade: '' }, ...(draft.records ?? [])]); setEditingRecord(id); }}>＋ 新增聯絡人計分 · 1 分</Button><Text style={s.muted}>內容可留白。新增聯絡人不計分；選擇新增聯絡人計分並儲存後才計分。</Text><Text style={s.muted}>新增、編輯或刪除紀錄後，按上方「儲存」才會保存。</Text>
           {(draft.records ?? []).filter(record=>recordRange.contains(record.date)||editingRecord===record.id).map(record => <View key={record.id} style={{ padding: 16, gap: 12, borderRadius: 12, backgroundColor: c.background }}>
             {editingRecord === record.id ? <><Field label="紀錄日期（YYYY-MM-DD）" value={record.date} onChange={date => set('records', draft.records!.map(item => item.id === record.id ? { ...item, date } : item))} />
             <Text style={s.label}>計分項目</Text><View style={s.row}>{[{code: '', label: '不計分', points: 0}, ...scoreRules].map(rule => <Button key={rule.code} secondary={(record.scoreCode ?? '') !== rule.code} disabled={saving} onPress={() => set('records', draft.records!.map(item => item.id === record.id ? {...item, scoreCode: rule.code} : item))}>{rule.label}{rule.code ? ` · ${rule.points} 分` : ''}</Button>)}</View>
@@ -96,6 +97,7 @@ export function ContactEditor({ session, contact, grades, saving, onSave, onClos
         {saved && !dirty && <Text accessibilityLiveRegion="polite" style={[s.muted, { padding: 16 }]}>已儲存</Text>}
         {!!error && <Text accessibilityRole="alert" style={[s.error, { padding: 16 }]}>{error}</Text>}
         <Modal visible={deletingRecord !== null} transparent animationType="fade" onRequestClose={() => setDeletingRecord(null)}><View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center', padding: 24 }}><View accessibilityViewIsModal style={{ width: '100%', maxWidth: 400, backgroundColor: c.paper, borderRadius: 16, padding: 24, gap: 20 }}><Text style={s.title}>確定刪除此筆紀錄？</Text><Text style={s.muted}>刪除後需按上方「儲存」才會生效。</Text><View style={s.row}><Button secondary onPress={() => setDeletingRecord(null)}>取消刪除</Button><Button disabled={saving} onPress={() => { set('records', (draft.records ?? []).filter(record => record.id !== deletingRecord)); if (editingRecord === deletingRecord) setEditingRecord(null); setDeletingRecord(null); }}>確認刪除</Button></View></View></View></Modal>
+        <Modal visible={genderPicker} transparent animationType="fade" onRequestClose={() => setGenderPicker(false)}><View style={{flex:1,backgroundColor:'rgba(0,0,0,0.4)',justifyContent:'center',alignItems:'center',padding:24}}><View accessibilityViewIsModal style={{width:'100%',maxWidth:400,padding:24,gap:12,borderRadius:16,backgroundColor:c.paper}}><Text style={s.title}>選擇性別</Text>{['男','女','其他','不透露',''].map(value=><Button key={value} secondary={draft.gender!==value} onPress={()=>{set('gender',value);setGenderPicker(false);}}>{value || '未填寫'}</Button>)}<Button secondary onPress={()=>setGenderPicker(false)}>取消</Button></View></View></Modal>
         <Modal visible={discard} transparent animationType="fade" onRequestClose={() => setDiscard(false)}><View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center', padding: 24 }}><View accessibilityViewIsModal style={{ width: '100%', maxWidth: 400, backgroundColor: c.paper, borderRadius: 16, padding: 24, gap: 20 }}><Text style={s.title}>尚有未儲存的修改</Text><Text style={s.muted}>返回會放棄這次修改，確定要離開嗎？</Text><View style={s.row}><Button secondary onPress={() => setDiscard(false)}>繼續編輯</Button><Button onPress={onClose}>放棄修改並返回</Button></View></View></View></Modal>
         <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: c.line, padding: 8, gap: 8 }}>
           {([{ key: 'grades', label: '分級' }, { key: 'home', label: '主頁' }, { key: 'records', label: '紀錄' }] as const).map(item => <Pressable key={item.key} accessibilityRole="button" accessibilityState={{ selected: section === item.key }} onPress={() => setSection(item.key)} style={{ flex: 1, minHeight: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: section === item.key ? c.pale : c.paper }}><Text style={{ color: c.green, fontWeight: section === item.key ? '700' : '400' }}>{item.label}</Text></Pressable>)}

@@ -10,7 +10,7 @@ export function verifyDatabase(file: string) {
     const integrity = db.prepare('PRAGMA integrity_check').all();
     if (integrity.length !== 1 || integrity[0].integrity_check !== 'ok' || db.prepare('PRAGMA foreign_key_check').all().length) throw new Error('資料庫完整性檢查失敗');
     const version = Number(db.prepare('PRAGMA user_version').get()!.user_version);
-    if (version < 4 || version > 6) throw new Error('不支援此備份版本');
+    if (version < 4 || version > 7) throw new Error('不支援此備份版本');
     for (const row of db.prepare('SELECT data FROM workspaces').all()) parseWorkspace(JSON.parse(String(row.data)));
     const counts = Object.fromEntries(['users','workspaces','grants','score_entries','audit_log','kpi_rules','report_settings'].map(table => [table, Number(db.prepare(`SELECT count(*) AS n FROM ${table}`).get()!.n)]));
     return {version,counts};

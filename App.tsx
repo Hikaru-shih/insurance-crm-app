@@ -1,3 +1,4 @@
+import { dailyActivities } from './src/domain/dailyActivity';
 import { Brand } from './src/ui/Brand';
 import { AccountSecurity } from './src/features/auth/AccountSecurity';
 import { ThemeProvider, useTheme } from './src/ui/theme';
@@ -92,7 +93,7 @@ function WorkspaceApp({ session, onExpired }: { session: Session; onExpired: () 
       {tab !== 'calendar' && <Text style={styles.heading}>{currentTab.label}</Text>}
       {!!accountError && <Text accessibilityRole="alert" style={s.muted}>{accountError}</Text>}
       {workspace.loading ? <Brand loading /> : workspace.loadError ? <Card><Text style={s.error}>{workspace.loadError}</Text><Button onPress={() => void workspace.reload()}>重試讀取</Button></Card> : <>
-        {tab === 'calendar' && <CalendarScreen onComplete={openEvent} events={[...contactFollowups(workspace.contacts, workspace.grades), ...datedEvents]} />}
+        {tab === 'calendar' && <View style={{gap:16}}><Button onPress={add}>＋ 新增聯絡人</Button><CalendarScreen activities={dailyActivities(workspace.contacts)} onComplete={openEvent} events={[...contactFollowups(workspace.contacts, workspace.grades), ...datedEvents]} /></View>}
         {tab === 'contacts' && <ContactsScreen key={contactListVisit} events={workspace.events} onOpenEvent={setEventEditor} initialContactId={selectedContactId} session={session} saving={workspace.saving} onDelete={workspace.deleteContact} onSave={workspace.saveContact} contacts={workspace.contacts} grades={workspace.grades} onAdd={add} onEdit={contact => setEditor({ contact })} />}
         {tab === 'appearance' && <AppearanceScreen />}
         {tab === 'security' && <AccountSecurity session={session} onComplete={onExpired} onBack={()=>setTab("calendar")} />}

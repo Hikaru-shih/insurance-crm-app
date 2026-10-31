@@ -150,7 +150,7 @@ export function createApi<T extends AsyncDatabase | undefined = undefined>(optio
             }
             if (path === '/api/health' && req.method === 'GET') {
                 await db.prepare('SELECT 1 FROM report_settings WHERE id=1').get();
-                json(res, 200, { ok: true, schema: db.kind === 'postgres' ? 2 : 6, database: db.kind });
+                json(res, 200, { ok: true, schema: db.kind === 'postgres' ? 3 : 7, database: db.kind });
                 return;
             }
             if (['/api/auth/request-verification', '/api/auth/forgot-password'].includes(path) && req.method === 'POST') {
